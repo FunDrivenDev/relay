@@ -1,0 +1,63 @@
+# Builds relay's release, attached to the GitHub release of each vX.Y.Z tag
+# (just release publish); `just release` (snapshot) replays it into dist/.
+# Linux only: the archives install.sh and the Homebrew formula
+# (scripts/formula.sh) download, and the .deb and .rpm packages.
+version: 2
+
+project_name: relay
+
+builds:
+  - main: ./cmd/relay
+    env:
+      - CGO_ENABLED=0
+    goos: [linux]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    ldflags: -s -w -X main.version={{ .Version }}
+    mod_timestamp: "{{ .CommitTimestamp }}"
+
+archives:
+  - formats: [tar.gz]
+    # relay_linux_amd64.tar.gz, without the version: the latest release's
+    # asset keeps one URL (releases/latest/download/…), which install.sh uses.
+    name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
+    files: [README.md, LICENSE]
+
+checksum:
+  name_template: checksums.txt
+
+nfpms:
+  - package_name: relay
+    # relay_1.2.3_amd64.deb, relay-1.2.3-1.x86_64.rpm: each format's own naming.
+    file_name_template: "{{ .ConventionalFileName }}"
+    vendor: FunDrivenDev
+    homepage: https://github.com/FunDrivenDev/relay
+    maintainer: FunDrivenDev <noreply@github.com>
+    description: Claude Code sessions under tmux, with the handover plugin's relay and AFK runs.
+    license: MIT
+    section: utils
+    formats: [deb, rpm]
+    bindir: /usr/bin
+    # The floors of relay doctor check (docs/doctor.md): tmux 3.2 for
+    # new-session -e. Python's 3.9 floor is not expressible across distros;
+    # relay doctor check holds it.
+    dependencies:
+      - tmux (>= 3.2)
+      - python3
+      - procps
+    recommends:
+      - git
+      - libnotify-bin
+    overrides:
+      rpm:
+        dependencies:
+          - tmux >= 3.2
+          - python3
+          - procps-ng
+        recommends:
+          - git
+          - libnotify
+
+changelog:
+  use: github
+  sort: asc

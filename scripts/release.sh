@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Usage: release.sh <snapshot|publish>.
-#   snapshot  builds the release archives into dist/, publishing nothing.
+#   snapshot  builds the Linux archives, checksums.txt and the .deb and .rpm
+#             packages into dist/, publishing nothing.
 #   publish   publishes the vX.Y.Z tag on HEAD as a GitHub release (GITHUB_TOKEN
-#             must be set); the Homebrew formula in FunDrivenDev/homebrew-tap
-#             is then bumped to it.
+#             must be set); scripts/formula.sh X.Y.Z then prints the Homebrew
+#             formula for FunDrivenDev/homebrew-tap (docs/development.md).
 set -euo pipefail
 
 case "$1" in
