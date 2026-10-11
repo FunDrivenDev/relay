@@ -15,11 +15,13 @@ exists $HOME/.local/bin/relay
 cmp curl.log latest.log
 rm curl.log
 
-# Run again: an update, in place. A doctor that fails is a hint, not a failure.
+# Run again: an update, in place. A doctor that fails is not a failure, and
+# its own hint is enough.
 env RELAY_DOCTOR_EXIT=1
 env PATH=$HOME/.local/bin:$PATH
 exec sh $REPO/install.sh
-stderr '^to install what is missing: relay doctor fix$'
+stderr '^doctor check ran$'
+! stderr 'to install what is missing'
 ! stderr 'is not on PATH'
 env RELAY_DOCTOR_EXIT=
 rm curl.log

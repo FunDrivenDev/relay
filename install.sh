@@ -64,19 +64,14 @@ chmod 755 "$dir/.relay.new"
 mv -f "$dir/.relay.new" "$dir/relay"
 say "installed $("$dir/relay" --version) in $dir"
 
-relay=relay
 case ":$PATH:" in
     *":$dir:"*) ;;
     *)
-        relay="$dir/relay"
         say "warning: $dir is not on PATH: add it to your shell's profile (export PATH=\"$dir:\$PATH\")"
         ;;
 esac
 
 say ""
-if "$dir/relay" doctor check; then
-    :
-else
-    say ""
-    say "to install what is missing: $relay doctor fix"
-fi
+# The doctor ends on its own hint (relay doctor fix) when it has something to
+# fix; a failing doctor is not a failed install.
+"$dir/relay" doctor check || true
