@@ -81,6 +81,24 @@ exec relay session create --help --json
 stdout '"afk": "boolean"'
 stdout '"state_changing": true'
 
+# Claude Code not logged in: an AFK run is refused before tmux starts, since
+# it cannot sign in; any other session starts, with a note.
+exec sh reset.sh
+cp logged-out.json auth.json
+exits 1 relay session create --name s4 --afk goal --json
+stderr '^\{"error":\{"code":"not_logged_in","message":"Claude Code is not logged in, and an AFK run cannot sign in: run claude once to sign in'
+! grep new-session stubs.log
+exec relay session create --name s4 --detach hi
+stderr '^note Claude Code is not logged in: it will ask you to sign in$'
+stderr '^session s4 created'
+exec relay session create --name s6 --afk goal --dry-run --json
+! stderr .
+# A Claude Code that gives no status: no verdict, no refusal.
+cp no-status.txt auth.json
+exec relay session create --name s10 --afk goal --json
+! stderr .
+rm auth.json
+
 # Attached, outside tmux: a named session on this terminal, which runs the
 # relay; already in tmux, the relay asks for no new session.
 exec sh reset.sh
@@ -117,6 +135,10 @@ for f in tmux claude python3; do cp "fake/$f" "bin/$f" && chmod +x "bin/$f"; don
 mkdir -p proj claude/plugins handover/scripts
 : >handover/scripts/handover.py
 printf '{"plugins": {"handover@fundrivendev": [{"installPath": "%s/handover"}]}}\n' "$WORK" >claude/plugins/installed_plugins.json
+-- logged-out.json --
+{"loggedIn": false, "authMethod": "none", "apiProvider": "firstParty"}
+-- no-status.txt --
+error: unknown command 'auth'
 -- reset.sh --
 rm -f stubs.log claude.log .claude.calls
 -- input.json --
@@ -158,6 +180,17 @@ exec "${cmd[@]}"
 -- fake/claude --
 #!/usr/bin/env bash
 # A fake claude: logs its arguments, its directory and the relay's environment.
+# claude auth status answers from $WORK/auth.json (logged in without it),
+# unlogged, exiting 1 when not logged in as Claude Code does.
+if [[ "$1 $2" == "auth status" ]]; then
+	if [[ -f "$WORK/auth.json" ]]; then
+		cat "$WORK/auth.json"
+		grep -q '"loggedIn": false' "$WORK/auth.json" && exit 1
+	else
+		echo '{"loggedIn": true, "authMethod": "claude.ai", "apiProvider": "firstParty"}'
+	fi
+	exit 0
+fi
 n=$(($(cat "$WORK/.claude.calls" 2>/dev/null || echo 0) + 1))
 echo "$n" >"$WORK/.claude.calls"
 {

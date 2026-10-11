@@ -136,6 +136,14 @@ func runCreate(ctx context.Context, env *cli.Env, p createParams) (any, error) {
 	if _, err := handoverPy(env); err != nil {
 		return nil, err
 	}
+	// Not logged in, Claude Code opens on its login screen: someone at the
+	// terminal can sign in there, an AFK run cannot.
+	if l := CheckLogin(ctx); l.Known && !l.LoggedIn {
+		if p.Afk {
+			return nil, fail.New(fail.NotLoggedIn, "Claude Code is not logged in, and an AFK run cannot sign in: %s", LoginHint)
+		}
+		env.Say("%s Claude Code is not logged in: it will ask you to sign in", env.Theme.Warn.Render("note"))
+	}
 	cmd, err := self()
 	if err != nil {
 		return nil, err

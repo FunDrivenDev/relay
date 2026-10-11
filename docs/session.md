@@ -71,8 +71,16 @@ session run …`) and nothing to stdout.
 Errors: `usage` (exit 2: `--afk` without a prompt, `--until` or `--yolo`
 without `--afk`, `--detach` or `--json` without `--name`, the contract's own),
 `not_found` (no such directory), `exists` (the session exists),
-`relay_missing` (the handover plugin is not installed), `tool_failed` and
+`relay_missing` (the handover plugin is not installed), `not_logged_in`
+(an AFK run while Claude Code is not logged in), `tool_failed` and
 `tool_missing` (tmux).
+
+Before starting anything (not on a dry run), relay asks Claude Code whether it
+is logged in (`claude auth status --json`, as `relay doctor check` does). An
+AFK run is refused when it is not (`not_logged_in`): nobody would be there to
+sign in. Any other session starts with a note on stderr, since Claude Code
+asks for the login on its terminal. A Claude Code that gives no status is let
+through.
 
 ```sh
 relay session create --name fix-ci --afk --until 8 --yolo 'make CI green' -- --model opus

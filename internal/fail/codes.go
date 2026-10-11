@@ -31,6 +31,8 @@ const (
 	// RelayMissing: the handover plugin is not installed (handover.py not found
 	// through its installPath in installed_plugins.json).
 	RelayMissing Code = "relay_missing"
+	// NotLoggedIn: an AFK run was asked for while Claude Code is not logged in.
+	NotLoggedIn Code = "not_logged_in"
 
 	// doctor: what relay needs on this machine.
 	// Declined: the person answered no to the confirmation; nothing ran.
@@ -56,6 +58,7 @@ var Codes = []Code{
 	ToolMissing,
 	TTYRequired,
 	RelayMissing,
+	NotLoggedIn,
 	Declined,
 	FixFailed,
 	RequirementsMissing,

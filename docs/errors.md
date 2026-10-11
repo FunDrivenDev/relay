@@ -43,6 +43,7 @@ checks this table lists every one, and only those.
 | `tool_missing` | 1 | an external tool is not on PATH |
 | `tty_required` | 1 | an interactive command was run under `--json`, or a confirmation found no terminal; the message gives what to run instead |
 | `relay_missing` | 1 | session: the handover plugin is not installed (`handover.py` not found through `installed_plugins.json`) |
+| `not_logged_in` | 1 | `session create --afk`: Claude Code is not logged in (`claude auth status`), and an AFK run cannot sign in; the message says how |
 | `declined` | 1 | `doctor fix`: the confirmation was answered no; nothing ran |
 | `fix_failed` | 1 | `doctor fix`: a fix command failed; the ones after it did not run, the checks were run again and reported |
 | `requirements_missing` | 1 | `doctor check`, `doctor fix`: a required check failed; the report on stdout lists it and its fix |

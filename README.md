@@ -38,8 +38,9 @@ served over HTTP).
 ## Check the machine
 
 ```sh
-relay doctor check   # read-only: Linux, tmux >= 3.2, claude, python3 >= 3.9,
-                     # ps, git, notify-send, the handover plugin, notifications
+relay doctor check   # read-only: Linux, tmux >= 3.2, claude and its login,
+                     # python3 >= 3.9, ps, git, notify-send, the handover
+                     # plugin, notifications
 relay doctor fix     # installs what is missing, after asking
 ```
 
@@ -49,6 +50,12 @@ Claude Code's installer (`curl -fsSL https://claude.ai/install.sh | bash`), then
 `claude plugin marketplace add FunDrivenDev/claude-plugins` and
 `claude plugin install handover@fundrivendev`. `--dry-run` shows the plan,
 `--yes` skips the question.
+
+Claude Code must be logged in: run `claude` once to sign in. Headless (a
+server, a VM), run `claude setup-token` and export the token it prints as
+`CLAUDE_CODE_OAUTH_TOKEN`, or set `ANTHROPIC_API_KEY`. `doctor check` says
+whether it is (`claude-login`); `session create --afk` refuses to start
+without it.
 
 `git`, `notify-send` and `notifications` are optional (see
 [Notifications](#notifications)). Ubuntu 20.04's tmux 3.0 and Python 3.8 are
