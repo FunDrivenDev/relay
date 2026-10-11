@@ -27,43 +27,66 @@ var Entity = &cli.Entity{
 	},
 }
 
-// pluginID is the handover plugin's key in installed_plugins.json.
-const pluginID = "handover@fundrivendev"
+// PluginID is the handover plugin's key in installed_plugins.json.
+const PluginID = "handover@fundrivendev"
 
-// handoverPy finds the handover plugin's handover.py: through the plugin's
+// Plugin is the installed handover plugin.
+type Plugin struct {
+	// Script is the path of its scripts/handover.py.
+	Script string
+	// Version is the version installed_plugins.json records; empty without one.
+	Version string
+}
+
+// ConfigDir is Claude Code's config directory: $CLAUDE_CONFIG_DIR, or
+// $HOME/.claude; empty when neither is set.
+func ConfigDir(env *cli.Env) string {
+	if dir := env.Getenv("CLAUDE_CONFIG_DIR"); dir != "" {
+		return dir
+	}
+	if home := env.Getenv("HOME"); home != "" {
+		return filepath.Join(home, ".claude")
+	}
+	return ""
+}
+
+// FindPlugin finds the handover plugin's handover.py: through the plugin's
 // installPath in ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins/installed_plugins.json.
 // The path changes with every plugin version, so it is looked up on every call.
-func handoverPy(env *cli.Env) (string, error) {
-	missing := fail.New(fail.RelayMissing, "%s is not installed", pluginID)
-	dir := env.Getenv("CLAUDE_CONFIG_DIR")
+func FindPlugin(env *cli.Env) (Plugin, error) {
+	missing := fail.New(fail.RelayMissing, "%s is not installed", PluginID)
+	dir := ConfigDir(env)
 	if dir == "" {
-		home := env.Getenv("HOME")
-		if home == "" {
-			return "", missing
-		}
-		dir = filepath.Join(home, ".claude")
+		return Plugin{}, missing
 	}
 	data, err := os.ReadFile(filepath.Join(dir, "plugins", "installed_plugins.json")) //nolint:gosec // Claude Code's own config, where the user points it
 	if err != nil {
-		return "", missing
+		return Plugin{}, missing
 	}
 	var installed struct {
 		Plugins map[string][]struct {
 			InstallPath string `json:"installPath"`
+			Version     string `json:"version"`
 		} `json:"plugins"`
 	}
-	if json.Unmarshal(data, &installed) != nil || len(installed.Plugins[pluginID]) == 0 {
-		return "", missing
+	if json.Unmarshal(data, &installed) != nil || len(installed.Plugins[PluginID]) == 0 {
+		return Plugin{}, missing
 	}
-	root := installed.Plugins[pluginID][0].InstallPath
-	if root == "" {
-		return "", missing
+	entry := installed.Plugins[PluginID][0]
+	if entry.InstallPath == "" {
+		return Plugin{}, missing
 	}
-	path := filepath.Join(root, "scripts", "handover.py")
+	path := filepath.Join(entry.InstallPath, "scripts", "handover.py")
 	if info, err := os.Stat(path); err != nil || info.IsDir() {
-		return "", missing
+		return Plugin{}, missing
 	}
-	return path, nil
+	return Plugin{Script: path, Version: entry.Version}, nil
+}
+
+// handoverPy is FindPlugin's handover.py.
+func handoverPy(env *cli.Env) (string, error) {
+	p, err := FindPlugin(env)
+	return p.Script, err
 }
 
 // exists reports whether tmux has a session named exactly name.

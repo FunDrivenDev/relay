@@ -90,7 +90,7 @@ func setup(env *testscript.Env) error {
 	}
 	env.Setenv("REPO", repo)
 	// Removed, not emptied: git rejects an empty GIT_WORK_TREE.
-	unset := []string{"GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY", "GIT_COMMON_DIR", "TMUX", "TMUX_PANE", "HANDOVER_RELAY", "HANDOVER_RELAY_OWN", "RELAY_GOOS", "RELAY_OS_RELEASE"}
+	unset := []string{"GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY", "GIT_COMMON_DIR", "TMUX", "TMUX_PANE", "HANDOVER_RELAY", "HANDOVER_RELAY_OWN", "RELAY_GOOS", "RELAY_OS_RELEASE", "RELAY_EUID"}
 	env.Vars = slices.DeleteFunc(env.Vars, func(kv string) bool {
 		name, _, _ := strings.Cut(kv, "=")
 		return slices.Contains(unset, name)

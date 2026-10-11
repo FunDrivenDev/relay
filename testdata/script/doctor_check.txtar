@@ -1,0 +1,205 @@
+# relay doctor check: what relay needs, checked without changing anything.
+# Every tool is a stub; RELAY_GOOS and RELAY_OS_RELEASE stand for the host,
+# RELAY_EUID for the user id, so nothing depends on the machine running it.
+
+env RELAY_GOOS=linux
+env RELAY_OS_RELEASE=$WORK/os-release
+env RELAY_EUID=1000
+stub tmux claude python3 ps git notify-send
+exec sh -c 'mkdir -p "$HOME/.claude/plugins" "$WORK/plugin/scripts" && touch "$WORK/plugin/scripts/handover.py" && sed "s|@WORK@|$WORK|" installed.json >"$HOME/.claude/plugins/installed_plugins.json" && cp known.json "$HOME/.claude/plugins/known_marketplaces.json"'
+
+# All met: the checklist, exit 0; the flag form and the JSON form agree.
+exec relay doctor check
+cmp stdout ok.txt
+! stderr .
+exec relay doctor check --json
+cmp stdout ok.json
+! stderr .
+exec relay doctor check --json='{}'
+cmp stdout ok.json
+
+# Elsewhere than Linux: a warning, never a failure.
+env RELAY_GOOS=darwin
+exec relay doctor check
+stdout '^! os +darwin: relay is made for Linux'
+stdout 'relay is ready.'
+env RELAY_GOOS=linux
+
+# The optional tools missing: warnings, and their packages in the plan.
+rm bin/git bin/notify-send
+exec relay doctor check --json
+stdout '"ok": true'
+stdout '"command": "sudo apt-get install -y git libnotify-bin"'
+exec relay doctor check
+stdout '^! notify-send +not found \(optional: AFK alerts fall back to the terminal bell\)$'
+stdout '^ +sudo apt-get install -y libnotify-bin$'
+stdout 'relay doctor fix'
+stub git notify-send
+
+# tmux missing: a required check fails, exit 1 (requirements_missing); the
+# report stays on stdout, under --json too. As root, no sudo.
+rm bin/tmux
+exits 1 relay doctor check
+stdout '^✗ tmux +not found on PATH$'
+stdout '^ +sudo apt-get install -y tmux$'
+! stderr .
+env RELAY_EUID=0
+exits 1 relay doctor check --json
+stdout '"ok": false'
+stdout '"fixes": \[\n +\{\n +"name": "packages",\n +"command": "apt-get install -y tmux"'
+cmp stderr missing.json
+env RELAY_EUID=1000
+stub tmux
+
+# tmux older than 3.2 (new-session -e): no automatic fix.
+cp tmux-old.txt stubs/tmux.stdout
+exits 1 relay doctor check --json
+stdout '"message": "tmux 3.0a is older than 3.2 \(new-session -e\)'
+stdout '"fix": null'
+stdout '"fixes": \[\]'
+cp tmux.txt stubs/tmux.stdout
+
+# Python older than 3.9 (str.removeprefix): no automatic fix either.
+cp python-old.txt stubs/python3.stdout
+exits 1 relay doctor check
+stdout '^✗ python3 +Python 3.8.10 is older than 3.9'
+cp python.txt stubs/python3.stdout
+
+# Claude Code missing, curl too: curl joins the packages, then the installer.
+rm bin/claude
+exits 1 relay doctor check --json
+stdout '"command": "sudo apt-get install -y curl"'
+stdout '"command": "curl -fsSL https://claude.ai/install.sh \| bash"'
+stub claude
+
+# The plugin missing, its marketplace known: only the install.
+rm home/.claude/plugins/installed_plugins.json
+exits 1 relay doctor check
+stdout '^✗ handover-plugin +handover@fundrivendev is not installed in Claude Code$'
+stdout '^ +claude plugin install handover@fundrivendev$'
+# The marketplace unknown too: added first.
+rm home/.claude/plugins/known_marketplaces.json
+exits 1 relay doctor check --json
+stdout '"fix": "claude plugin marketplace add FunDrivenDev/claude-plugins && claude plugin install handover@fundrivendev"'
+stdout '"name": "marketplace",\n +"command": "claude plugin marketplace add FunDrivenDev/claude-plugins"'
+
+# Read-only: no --dry-run; --help --json describes the output.
+exits 2 relay doctor check --dry-run
+stderr 'unknown option: --dry-run'
+exec relay doctor check --help --json
+stdout '"output": "\{\\"ok\\", \\"os\\", \\"distro\\"'
+
+-- os-release --
+NAME="Ubuntu"
+VERSION="24.04.1 LTS (Noble Numbat)"
+PRETTY_NAME="Ubuntu 24.04.1 LTS"
+-- installed.json --
+{"version": 2, "plugins": {"handover@fundrivendev": [{"scope": "user", "installPath": "@WORK@/plugin", "version": "0.15.0"}]}}
+-- known.json --
+{"fundrivendev": {"source": {"source": "github", "repo": "FunDrivenDev/claude-plugins"}}}
+-- stubs/tmux.stdout --
+tmux 3.4
+-- tmux.txt --
+tmux 3.4
+-- tmux-old.txt --
+tmux 3.0a
+-- stubs/claude.stdout --
+2.1.296 (Claude Code)
+-- stubs/python3.stdout --
+Python 3.12.3
+-- python.txt --
+Python 3.12.3
+-- python-old.txt --
+Python 3.8.10
+-- stubs/ps.stdout --
+ps from procps-ng 4.0.4
+-- stubs/git.stdout --
+git version 2.43.0
+-- stubs/notify-send.stdout --
+notify-send 0.8.3
+-- missing.json --
+{"error":{"code":"requirements_missing","message":"missing requirements: tmux (relay doctor fix)"}}
+-- ok.txt --
+✓ os               linux, Ubuntu 24.04.1 LTS
+✓ tmux             tmux 3.4
+✓ claude           Claude Code 2.1.296
+✓ python3          Python 3.12.3
+✓ ps               ps 4.0.4
+✓ git              git 2.43.0
+✓ notify-send      notify-send 0.8.3
+✓ handover-plugin  handover@fundrivendev 0.15.0
+
+relay is ready.
+-- ok.json --
+{
+  "ok": true,
+  "os": "linux",
+  "distro": "Ubuntu 24.04.1 LTS",
+  "checks": [
+    {
+      "name": "os",
+      "ok": true,
+      "required": false,
+      "version": "Ubuntu 24.04.1 LTS",
+      "message": "linux, Ubuntu 24.04.1 LTS",
+      "fix": null
+    },
+    {
+      "name": "tmux",
+      "ok": true,
+      "required": true,
+      "version": "3.4",
+      "message": "tmux 3.4",
+      "fix": null
+    },
+    {
+      "name": "claude",
+      "ok": true,
+      "required": true,
+      "version": "2.1.296",
+      "message": "Claude Code 2.1.296",
+      "fix": null
+    },
+    {
+      "name": "python3",
+      "ok": true,
+      "required": true,
+      "version": "3.12.3",
+      "message": "Python 3.12.3",
+      "fix": null
+    },
+    {
+      "name": "ps",
+      "ok": true,
+      "required": true,
+      "version": "4.0.4",
+      "message": "ps 4.0.4",
+      "fix": null
+    },
+    {
+      "name": "git",
+      "ok": true,
+      "required": false,
+      "version": "2.43.0",
+      "message": "git 2.43.0",
+      "fix": null
+    },
+    {
+      "name": "notify-send",
+      "ok": true,
+      "required": false,
+      "version": "0.8.3",
+      "message": "notify-send 0.8.3",
+      "fix": null
+    },
+    {
+      "name": "handover-plugin",
+      "ok": true,
+      "required": true,
+      "version": "0.15.0",
+      "message": "handover@fundrivendev 0.15.0",
+      "fix": null
+    }
+  ],
+  "fixes": []
+}
