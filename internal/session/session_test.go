@@ -149,3 +149,20 @@ func TestListHuman(t *testing.T) {
 		t.Error("no sessions: no table")
 	}
 }
+
+func TestLoginDescribe(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		l    Login
+		want string
+	}{
+		{Login{AuthMethod: "claude.ai", Provider: "firstParty"}, "claude.ai"},
+		{Login{AuthMethod: "third_party", Provider: "bedrock"}, "third_party, bedrock"},
+		{Login{}, ""},
+	}
+	for _, c := range cases {
+		if got := c.l.Describe(); got != c.want {
+			t.Errorf("%+v: got %q, want %q", c.l, got, c.want)
+		}
+	}
+}

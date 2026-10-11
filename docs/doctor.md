@@ -18,6 +18,7 @@ commands follow [the CLI contract](contract.md).
 | `os` | no | Linux; the distribution is read from `/etc/os-release` | none: a warning |
 | `tmux` | yes | on PATH, 3.2 or later | `sudo apt-get install -y tmux` |
 | `claude` | yes | Claude Code on PATH | `curl -fsSL https://claude.ai/install.sh \| bash` |
+| `claude-login` | yes | Claude Code logged in, as `claude auth status --json` says | none: run `claude` once to sign in; headless, `claude setup-token` then `CLAUDE_CODE_OAUTH_TOKEN`, or `ANTHROPIC_API_KEY` |
 | `python3` | yes | on PATH, 3.9 or later | `sudo apt-get install -y python3` |
 | `ps` | yes | procps' `ps`, taking `-o ppid= -p 1` | `sudo apt-get install -y procps` |
 | `git` | no | on PATH | `sudo apt-get install -y git` |
@@ -31,6 +32,15 @@ Why these:
   `tmux new-session -e`, which came in tmux 3.2 (Ubuntu 22.04 ships 3.2a;
   20.04 ships 3.0a, too old). A tmux below the floor has no automatic fix:
   upgrade the distribution or build tmux.
+- **claude-login**: a session that is not logged in opens on Claude Code's
+  login screen, where an AFK run waits forever. relay asks Claude Code itself
+  (`claude auth status --json`, its `loggedIn`), which counts a stored login,
+  `CLAUDE_CODE_OAUTH_TOKEN`, `ANTHROPIC_API_KEY` and the cloud providers'
+  variables (Bedrock, Vertex…) alike, and prints no secret; the message gives
+  the auth method (`claude.ai`, `oauth_token`, `api_key`, `third_party`…).
+  Signing in takes a person, so there is no automatic fix. The check is
+  skipped (`!`, not required) while `claude` is missing, the `claude` check
+  failing already, or when Claude Code gives no status (before 2.1).
 - **Python 3.9**: the handover plugin's `handover.py` uses
   `str.removeprefix`. Ubuntu 20.04's 3.8 is too old, with the same advice.
 - **ps**: `handover.py` walks the process tree with `ps -o ppid= -p <pid>`.
@@ -54,7 +64,7 @@ Why these:
   you. Skipped when the plugin or python3 is missing.
 
 The optional checks (`os`, `git`, `notify-send`, `notifications`) never fail the doctor; they
-show as `!`. A `claude` in `~/.local/bin` while that directory is off PATH
+show as `!`, as does a skipped `claude-login`. A `claude` in `~/.local/bin` while that directory is off PATH
 fails the `claude` check with no fix but the advice to add it to the shell's
 profile: tmux runs `claude` through PATH, and reinstalling would not help.
 
@@ -72,7 +82,10 @@ relay doctor check --json
 Prints a checklist: `✓` met, `✗` a required check failed, `!` an optional one,
 each unmet check followed by its fix. Exits 1 with code
 `requirements_missing` when a required check fails; under `--json` the report
-is still printed on stdout, and the error envelope goes to stderr.
+is still printed on stdout, and the error envelope goes to stderr. Its message
+ends on `(relay doctor fix)`, or, when nothing in the plan would help (only
+`claude-login`, say), on `(no automatic fix: relay doctor check says what to
+do)`.
 
 ```json
 {

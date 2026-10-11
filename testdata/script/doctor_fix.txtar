@@ -128,6 +128,11 @@ for p in "$@"; do
 done
 -- fake-claude --
 #!/bin/sh
+# Logged in (auth status is not logged: the steps are what this script checks).
+if [ "$*" = 'auth status --json' ]; then
+	echo '{"loggedIn": true, "authMethod": "claude.ai", "apiProvider": "firstParty"}'
+	exit 0
+fi
 echo "claude $*" >>"$WORK/stubs.log"
 case "$*" in
 --version) echo '2.1.296 (Claude Code)' ;;
@@ -204,6 +209,14 @@ esac
       "version": "",
       "message": "Claude Code not found on PATH",
       "fix": "curl -fsSL https://claude.ai/install.sh | bash"
+    },
+    {
+      "name": "claude-login",
+      "ok": false,
+      "required": false,
+      "version": "",
+      "message": "skipped: Claude Code is not on PATH",
+      "fix": null
     },
     {
       "name": "python3",

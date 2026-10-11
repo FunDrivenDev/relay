@@ -6,8 +6,8 @@ env RELAY_GOOS=linux
 env RELAY_OS_RELEASE=$WORK/os-release
 env RELAY_EUID=1000
 env DISPLAY=:0
-stub tmux claude ps git notify-send
-exec sh -c 'cp fake-python3 bin/python3 && chmod +x bin/python3'
+stub tmux ps git notify-send
+exec sh -c 'cp fake-python3 bin/python3 && cp fake-claude bin/claude && chmod +x bin/python3 bin/claude'
 exec sh -c 'mkdir -p "$HOME/.claude/plugins" "$WORK/plugin/scripts" && touch "$WORK/plugin/scripts/handover.py" && sed "s|@WORK@|$WORK|" installed.json >"$HOME/.claude/plugins/installed_plugins.json" && cp known.json "$HOME/.claude/plugins/known_marketplaces.json"'
 
 # All met: the checklist, exit 0; the flag form and the JSON form agree.
@@ -108,7 +108,29 @@ rm bin/claude
 exits 1 relay doctor check --json
 stdout '"command": "sudo apt-get install -y curl"'
 stdout '"command": "curl -fsSL https://claude.ai/install.sh \| bash"'
-stub claude
+# The login check is skipped then: the claude check says it all.
+stdout '"name": "claude-login",\n +"ok": false,\n +"required": false,\n +"version": "",\n +"message": "skipped: Claude Code is not on PATH"'
+stderr '"message":"missing requirements: claude \(relay doctor fix\)"'
+exec sh -c 'cp fake-claude bin/claude && chmod +x bin/claude'
+
+# Claude Code not logged in: a required check with no fix, only the hint.
+cp logged-out.json auth.json
+exits 1 relay doctor check
+stdout '^✗ claude-login +not logged in: run claude once to sign in \(or claude auth login\); headless: claude setup-token, then export CLAUDE_CODE_OAUTH_TOKEN, or set ANTHROPIC_API_KEY$'
+! stdout 'relay doctor fix'
+exits 1 relay doctor check --json
+stdout '"fixes": \[\]'
+stderr '"message":"missing requirements: claude-login \(no automatic fix: relay doctor check says what to do\)"'
+# Logged in through the environment (ANTHROPIC_API_KEY, here), as Claude
+# Code reports it.
+cp api-key.json auth.json
+exec relay doctor check
+stdout '^✓ claude-login +logged in \(api_key\)$'
+# A Claude Code without auth status: no verdict, not a failure.
+cp no-status.txt auth.json
+exec relay doctor check
+stdout '^! claude-login +unknown: claude auth status gave no status'
+rm auth.json
 
 # The plugin missing, its marketplace known: only the install.
 rm home/.claude/plugins/installed_plugins.json
@@ -161,8 +183,28 @@ tmux 3.4
 tmux 3.4
 -- tmux-old.txt --
 tmux 3.0a
--- stubs/claude.stdout --
-2.1.296 (Claude Code)
+-- fake-claude --
+#!/bin/sh
+# A fake claude: --version, and auth status from auth.json (logged in through
+# a claude.ai account without it), exiting 1 when not logged in.
+case "$*" in
+--version) echo '2.1.296 (Claude Code)' ;;
+'auth status --json')
+	if [ -f "$WORK/auth.json" ]; then
+		cat "$WORK/auth.json"
+		grep -q '"loggedIn": false' "$WORK/auth.json" && exit 1
+	else
+		echo '{"loggedIn": true, "authMethod": "claude.ai", "apiProvider": "firstParty"}'
+	fi
+	;;
+esac
+exit 0
+-- logged-out.json --
+{"loggedIn": false, "authMethod": "none", "apiProvider": "firstParty"}
+-- api-key.json --
+{"loggedIn": true, "authMethod": "api_key", "apiProvider": "firstParty", "apiKeySource": "ANTHROPIC_API_KEY"}
+-- no-status.txt --
+error: unknown command 'auth'
 -- stubs/python3.stdout --
 Python 3.12.3
 -- python.txt --
@@ -181,6 +223,7 @@ notify-send 0.8.3
 ✓ os               linux, Ubuntu 24.04.1 LTS
 ✓ tmux             tmux 3.4
 ✓ claude           Claude Code 2.1.296
+✓ claude-login     logged in (claude.ai)
 ✓ python3          Python 3.12.3
 ✓ ps               ps 4.0.4
 ✓ git              git 2.43.0
@@ -217,6 +260,14 @@ relay is ready.
       "required": true,
       "version": "2.1.296",
       "message": "Claude Code 2.1.296",
+      "fix": null
+    },
+    {
+      "name": "claude-login",
+      "ok": true,
+      "required": true,
+      "version": "claude.ai",
+      "message": "logged in (claude.ai)",
       "fix": null
     },
     {

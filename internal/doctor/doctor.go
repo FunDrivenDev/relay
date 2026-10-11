@@ -146,6 +146,8 @@ var check = cli.New(cli.Spec{
   os               Linux (a warning elsewhere), the distribution from /etc/os-release
   tmux             on PATH, 3.2 or later (new-session -e)
   claude           Claude Code on PATH
+  claude-login     Claude Code logged in (claude auth status): a stored login,
+                   CLAUDE_CODE_OAUTH_TOKEN, ANTHROPIC_API_KEY or a cloud provider
   python3          on PATH, 3.9 or later (the plugin's handover.py)
   ps               procps' ps, which handover.py walks (ps -o ppid= -p)
   git              optional: handover.py reads the repo for context
@@ -176,9 +178,13 @@ func (r Report) err(env *cli.Env) error {
 			missing = append(missing, c.Name)
 		}
 	}
+	hint := " (relay doctor fix)"
+	if len(r.Fixes) == 0 {
+		hint = " (no automatic fix: relay doctor check says what to do)"
+	}
 	return &fail.Error{
 		Code: fail.RequirementsMissing, Silent: !env.JSON,
-		Message: "missing requirements: " + strings.Join(missing, ", ") + " (relay doctor fix)",
+		Message: "missing requirements: " + strings.Join(missing, ", ") + hint,
 	}
 }
 
@@ -196,6 +202,7 @@ func inspect(ctx context.Context, env *cli.Env) Report {
 		osCheck,
 		checkTmux(ctx),
 		checkClaude(ctx, env),
+		checkLogin(ctx),
 		checkPython(ctx),
 		checkPS(ctx),
 		checkGit(ctx),
@@ -429,6 +436,33 @@ func checkClaude(ctx context.Context, env *cli.Env) Check {
 	c.Message = "Claude Code " + c.Version
 	if err != nil || c.Version == "" {
 		c.Message = "Claude Code on PATH (claude --version did not answer with a version)"
+	}
+	return c
+}
+
+// checkLogin checks that Claude Code is logged in, which no session can do
+// without: an AFK run would sit on the login screen. No automatic fix, only
+// the hint. Skipped, and so not failing, when claude is missing or gives no
+// status.
+func checkLogin(ctx context.Context) Check {
+	c := Check{Name: "claude-login", Required: true}
+	l := session.CheckLogin(ctx)
+	switch {
+	case !run.Has("claude"):
+		c.Required = false
+		c.Message = "skipped: Claude Code is not on PATH"
+	case !l.Known:
+		c.Required = false
+		c.Message = "unknown: claude auth status gave no status (Claude Code 2.1 or later has it)"
+	case !l.LoggedIn:
+		c.Message = "not logged in: " + session.LoginHint
+	default:
+		c.OK = true
+		c.Version = l.AuthMethod
+		c.Message = "logged in"
+		if d := l.Describe(); d != "" {
+			c.Message += " (" + d + ")"
+		}
 	}
 	return c
 }
