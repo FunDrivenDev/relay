@@ -1,0 +1,61 @@
+# Bare relay, an entity alone, --help: the usage, exit 0. The
+# list of commands grows with each entity: only the fixture's lines are checked.
+
+exec relay
+cp stdout usage.txt
+! stderr .
+stdout '^Usage: relay <entity> <verb> \[options\] \[--json\[=<input>\]\]$'
+stdout '^  fixture echo +prints its input back$'
+stdout '^  fixture raw +takes its arguments untouched$'
+stdout '^  fixture group hello +a verb grouped under a noun$'
+grep -count=1 'relay <entity> <verb> --help: a command''s help; with --json, its input spec.' usage.txt
+grep -count=1 '^\{"error": \{"code", "message"\}\} on stderr.$' usage.txt
+exec relay --help
+cmp stdout usage.txt
+exec relay -h
+cmp stdout usage.txt
+exec relay help
+cmp stdout usage.txt
+
+exec relay fixture
+stdout '^Usage: relay fixture <verb>'
+stdout '^  fixture echo +prints its input back$'
+exec relay fixture --help
+stdout '^Usage: relay fixture <verb>'
+
+# A group of verbs: relay <entity> <group> lists them.
+exec relay fixture group hello
+stdout '^hello$'
+exec relay fixture group
+stdout '^Usage: relay fixture group <verb>'
+stdout '^  fixture group hello +a verb grouped under a noun$'
+! stdout 'fixture echo'
+exec relay fixture group --help --json
+stdout '"command": "relay fixture group hello"'
+! stdout 'fixture echo'
+exec relay fixture group hello --help --json
+stdout '"command": "relay fixture group hello"'
+exits 2 relay fixture group bogus --json
+stderr '^\{"error":\{"code":"usage","message":"unknown verb: fixture group bogus \(relay fixture group --help\)"\}\}$'
+
+# The index as JSON.
+exec relay --help --json
+stdout '"command": "relay fixture echo",'
+exec relay fixture --help --json
+stdout '"summary": "prints its input back"'
+
+# Unknown commands and verbs: usage errors, as JSON under --json.
+exits 2 relay bogus
+stderr '^relay: unknown command: bogus \(relay --help\)$'
+exits 2 relay --bogus
+stderr 'unknown command: --bogus'
+exits 2 relay fixture bogus --json
+stderr '^\{"error":\{"code":"usage","message":"unknown verb: fixture bogus \(relay fixture --help\)"\}\}$'
+
+# --version, set at build time; dev from source.
+exec relay --version
+stdout '^relay dev$'
+exec relay --version --json
+stdout '"version": "dev"'
+exits 2 relay --version extra
+stderr 'takes no argument'

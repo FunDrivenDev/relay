@@ -1,0 +1,25 @@
+# A raw command takes its arguments untouched (relay session run gets claude's
+# arguments as is); only a lone --help is read.
+
+exec relay fixture raw -Y sign -n git --json --bogus=1 -- x
+cmp stdout args.txt
+! stderr .
+
+# A lone --json is an argument, not a request for help.
+exec relay fixture raw --json
+stdout '^--json$'
+
+exec relay fixture raw --help
+stdout '^Usage: relay fixture raw <arguments…>'
+exec relay fixture raw --help --json
+stdout '"raw": true'
+
+-- args.txt --
+-Y
+sign
+-n
+git
+--json
+--bogus=1
+--
+x

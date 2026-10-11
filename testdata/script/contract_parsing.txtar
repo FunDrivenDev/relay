@@ -1,0 +1,80 @@
+# The strict parser: every mistake is a usage error (exit 2), naming the help.
+
+# A value flag never takes an argument starting with -: --opt=value is the way.
+exits 2 relay fixture echo hello --tags -a
+stderr '^relay: --tags expects a value \(write --tags=<value> if it starts with -\) \(relay fixture echo --help\)$'
+! stdout .
+exec relay fixture echo hello --tags=-a --json
+stdout '"-a"'
+
+# A value flag at the end without a value.
+exits 2 relay fixture echo hello --mode
+stderr '--mode expects a value'
+
+# A boolean takes no value.
+exits 2 relay fixture echo hello --loud=yes
+stderr '^relay: --loud takes no value \(relay fixture echo --help\)$'
+
+# A repeated flag, an unknown one, an unknown short one.
+exits 2 relay fixture echo hello --loud --loud
+stderr 'repeated option: --loud'
+exits 2 relay fixture echo hello -n 1 --count 2
+stderr 'repeated option: --count'
+exits 2 relay fixture echo hello --bogus
+stderr '^relay: unknown option: --bogus \(relay fixture echo --help\)$'
+exits 2 relay fixture echo hello -x
+stderr 'unknown option: -x'
+exits 2 relay fixture echo hello --dry_run
+stderr 'unknown option: --dry_run'
+# The rest param is no flag.
+exits 2 relay fixture echo hello --args x
+stderr 'unknown option: --args'
+
+# One positional argument.
+exits 2 relay fixture echo hello world
+stderr 'only one positional argument \(<text>\); extra: world'
+exits 2 relay fixture fail usage --quiet extra
+stderr 'only one positional argument'
+
+# The positional may be given as its flag, not both.
+exec relay fixture echo --text hello --json
+stdout '"text": "hello"'
+exits 2 relay fixture echo --text hello hello
+stderr 'only one positional argument'
+
+# Required, enum, integer.
+exits 2 relay fixture echo
+stderr '^relay: missing <text> \(relay fixture echo --help\)$'
+exits 2 relay fixture echo hi --mode shout
+stderr '--mode: "shout" is not one of plain, upper'
+exits 2 relay fixture echo hi --count two
+stderr '--count expects an integer, not "two"'
+# A negative integer goes through =.
+exits 2 relay fixture echo hi --count -1
+stderr '--count expects a value'
+exits 2 relay fixture echo hi --count=-1
+stderr '--count must be at least 1, not -1'
+
+# An optional value is given only through =.
+exec relay fixture echo hi --color --json
+stdout '"color": "auto"'
+exec relay fixture echo hi --color=never --json
+stdout '"color": "never"'
+exec relay fixture echo --color never --json
+stdout '"text": "never"'
+stdout '"color": "auto"'
+
+# Arguments after -- pass through untouched, flags included.
+exec relay fixture echo hi --json -- --loud -n x
+stdout '"loud": false'
+stdout '"--loud",'
+exits 2 relay fixture fail usage -- x
+stderr 'no arguments are accepted after --'
+
+# Under --json, every usage error is the envelope, even one raised before --json.
+exits 2 relay fixture echo hello --bogus --json
+cmp stderr bogus.json
+! stdout .
+
+-- bogus.json --
+{"error":{"code":"usage","message":"unknown option: --bogus (relay fixture echo --help)"}}

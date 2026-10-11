@@ -1,0 +1,11 @@
+// Package commands is relay's registry: the one place an entity is wired in.
+package commands
+
+import (
+	"github.com/FunDrivenDev/relay/internal/cli"
+)
+
+// Entities lists relay's entities: one line each, sorted by name.
+func Entities() []*cli.Entity {
+	return []*cli.Entity{}
+}

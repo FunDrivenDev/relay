@@ -1,0 +1,31 @@
+# An interactive command refuses under --json with tty_required, naming the
+# command to run in a terminal.
+
+exits 1 relay fixture pick 'my thing' --fast --json
+cmp stderr refused.json
+! stdout .
+exits 1 relay fixture pick --json='{"name": "-x"}'
+stderr '"code":"tty_required"'
+stderr 'relay fixture pick --name=-x"'
+
+# Usage errors come first.
+exits 2 relay fixture pick --json
+stderr '"code":"usage"'
+
+# Without --json it runs.
+exec relay fixture pick thing
+stdout '^picked thing$'
+
+# Its dry run asks nothing: it runs under --json, in both forms.
+exec relay fixture pick thing --dry-run --json
+stdout '"would_pick": "thing"'
+cp stdout flags.json
+exec relay fixture pick --json='{"name": "thing", "dry_run": true}'
+cmp stdout flags.json
+exits 1 relay fixture pick --json='{"name": "thing", "dry_run": false}'
+stderr '"code":"tty_required"'
+exec relay fixture pick --help
+stdout '--dry-run asks nothing and runs under --json'
+
+-- refused.json --
+{"error":{"code":"tty_required","message":"relay fixture pick is interactive: run it in a terminal, without --json: relay fixture pick --fast 'my thing'"}}
