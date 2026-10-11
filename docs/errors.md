@@ -46,3 +46,4 @@ checks this table lists every one, and only those.
 | `declined` | 1 | `doctor fix`: the confirmation was answered no; nothing ran |
 | `fix_failed` | 1 | `doctor fix`: a fix command failed; the ones after it did not run, the checks were run again and reported |
 | `requirements_missing` | 1 | `doctor check`, `doctor fix`: a required check failed; the report on stdout lists it and its fix |
+| `not_sent` | 1 | `notifier test`: the test alert got through no notifier, not even the terminal bell; the report on stdout says why |

@@ -4,6 +4,7 @@ package commands
 import (
 	"github.com/FunDrivenDev/relay/internal/cli"
 	"github.com/FunDrivenDev/relay/internal/doctor"
+	"github.com/FunDrivenDev/relay/internal/notifier"
 	"github.com/FunDrivenDev/relay/internal/session"
 )
 
@@ -11,6 +12,7 @@ import (
 func Entities() []*cli.Entity {
 	return []*cli.Entity{
 		doctor.Entity,
+		notifier.Entity,
 		session.Entity,
 	}
 }

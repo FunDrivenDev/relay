@@ -39,6 +39,10 @@ const (
 	FixFailed Code = "fix_failed"
 	// RequirementsMissing: a required check failed; the report lists the fixes.
 	RequirementsMissing Code = "requirements_missing"
+
+	// notifier: the handover plugin's notifications.
+	// NotSent: the test alert got through no notifier, not even the bell.
+	NotSent Code = "not_sent"
 )
 
 // Codes lists every code, for the docs check.
@@ -55,4 +59,5 @@ var Codes = []Code{
 	Declined,
 	FixFailed,
 	RequirementsMissing,
+	NotSent,
 }
