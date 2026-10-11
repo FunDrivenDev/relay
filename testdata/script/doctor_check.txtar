@@ -122,11 +122,11 @@ case $1 in
 *) [ "$2" = notifier ] && cat "$WORK/notifier.json" ;;
 esac
 -- headless.json --
-{"environment": {"os": "linux", "desktop": false, "ssh": true, "why": "over SSH, without a display", "tools": {"osascript": false, "notify-send": false}}, "notifier": "auto", "notify_command_set": false, "adapters": ["bell"], "reaches_you": false, "hints": ["over SSH, without a display: only the bell rings; set notify_command (Slack, ntfy…) to be reached", "options: /handover:config, or: claude plugin configure handover@fundrivendev; guide: https://github.com/FunDrivenDev/claude-plugins/blob/main/plugins/handover/docs/notifications.md"]}
+{"environment": {"os": "linux", "desktop": false, "ssh": true, "why": "over SSH, without a display", "tools": {"osascript": null, "notify-send": null}}, "notifier": "auto", "notify_command_set": false, "adapters": ["bell"], "reaches_you": false, "hints": ["over SSH, without a display: only the bell rings; set notify_command (Slack, ntfy…) to be reached", "options: /handover:config, or: claude plugin configure handover@fundrivendev; guide: https://github.com/FunDrivenDev/claude-plugins/blob/main/plugins/handover/docs/notifications.md"]}
 -- notifier.txt --
-{"environment": {"os": "linux", "desktop": true, "ssh": false, "why": "a Linux desktop session", "tools": {"osascript": false, "notify-send": true}}, "notifier": "auto", "notify_command_set": false, "adapters": ["notify-send", "bell"], "reaches_you": true, "hints": []}
+{"environment": {"os": "linux", "desktop": true, "ssh": false, "why": "a Linux desktop session", "tools": {"osascript": null, "notify-send": "/usr/bin/notify-send"}}, "notifier": "auto", "notify_command_set": false, "adapters": ["notify-send", "bell"], "reaches_you": true, "hints": []}
 -- notifier.json --
-{"environment": {"os": "linux", "desktop": true, "ssh": false, "why": "a Linux desktop session", "tools": {"osascript": false, "notify-send": true}}, "notifier": "auto", "notify_command_set": false, "adapters": ["notify-send", "bell"], "reaches_you": true, "hints": []}
+{"environment": {"os": "linux", "desktop": true, "ssh": false, "why": "a Linux desktop session", "tools": {"osascript": null, "notify-send": "/usr/bin/notify-send"}}, "notifier": "auto", "notify_command_set": false, "adapters": ["notify-send", "bell"], "reaches_you": true, "hints": []}
 -- os-release --
 NAME="Ubuntu"
 VERSION="24.04.1 LTS (Noble Numbat)"

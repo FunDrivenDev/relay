@@ -35,10 +35,10 @@ type Environment struct {
 	// OS is macos, linux, wsl or other.
 	OS string `json:"os"`
 	// Desktop: a desktop notification can reach a screen here.
-	Desktop bool            `json:"desktop"`
-	SSH     bool            `json:"ssh"`
-	Why     string          `json:"why"`
-	Tools   map[string]bool `json:"tools"`
+	Desktop bool               `json:"desktop"`
+	SSH     bool               `json:"ssh"`
+	Why     string             `json:"why"`
+	Tools   map[string]*string `json:"tools"` // each tool's path, null when missing
 }
 
 // Report is `handover.py notifier`'s report.

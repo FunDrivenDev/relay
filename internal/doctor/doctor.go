@@ -488,7 +488,10 @@ func checkNotify(ctx context.Context, alerts notifier.Report, alertsErr error) C
 	if !found {
 		if e := alerts.Environment; alertsErr == nil && (e.OS != "linux" || !e.Desktop) {
 			c.OK = true
-			c.Message = "not used here (" + e.Why + "): set notify_command (Slack, ntfy…) to be reached, see notifications"
+			c.Message = "not used here (" + e.Why + ")"
+			if !alerts.ReachesYou {
+				c.Message += ": set notify_command (Slack, ntfy…) to be reached, see notifications"
+			}
 			return c
 		}
 		c.Message = "not found (optional: desktop alerts of AFK runs; without it, the terminal bell)"

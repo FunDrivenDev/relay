@@ -95,7 +95,7 @@ case $1 in
 *) [ "$2" = notifier ] && cat "$WORK/notifier.json" ;;
 esac
 -- notifier.json --
-{"environment": {"os": "linux", "desktop": true, "ssh": false, "why": "a Linux desktop session", "tools": {"osascript": false, "notify-send": true}}, "notifier": "auto", "notify_command_set": false, "adapters": ["notify-send", "bell"], "reaches_you": true, "hints": []}
+{"environment": {"os": "linux", "desktop": true, "ssh": false, "why": "a Linux desktop session", "tools": {"osascript": null, "notify-send": "/usr/bin/notify-send"}}, "notifier": "auto", "notify_command_set": false, "adapters": ["notify-send", "bell"], "reaches_you": true, "hints": []}
 -- os-release --
 PRETTY_NAME="Ubuntu 24.04.1 LTS"
 -- stubs/python3.stdout --
