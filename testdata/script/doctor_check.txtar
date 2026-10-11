@@ -5,6 +5,7 @@
 env RELAY_GOOS=linux
 env RELAY_OS_RELEASE=$WORK/os-release
 env RELAY_EUID=1000
+env DISPLAY=:0
 stub tmux claude ps git notify-send
 exec sh -c 'cp fake-python3 bin/python3 && chmod +x bin/python3'
 exec sh -c 'mkdir -p "$HOME/.claude/plugins" "$WORK/plugin/scripts" && touch "$WORK/plugin/scripts/handover.py" && sed "s|@WORK@|$WORK|" installed.json >"$HOME/.claude/plugins/installed_plugins.json" && cp known.json "$HOME/.claude/plugins/known_marketplaces.json"'
@@ -41,6 +42,23 @@ exec relay doctor check
 stdout '^! notify-send +not found \(optional: desktop alerts of AFK runs; without it, the terminal bell\)$'
 stdout '^ +sudo apt-get install -y libnotify-bin$'
 stdout 'relay doctor fix'
+
+# No DISPLAY, no WAYLAND_DISPLAY, and no word from the plugin: headless, so
+# notify-send is an advisory and libnotify-bin stays out of the plan.
+env DISPLAY=
+cp error.json notifier.json
+exec relay doctor check
+stdout '^! notify-send +not found, not installed: no display \(DISPLAY, WAYLAND_DISPLAY\)'
+! stdout libnotify-bin
+exec relay doctor check --json
+stdout '"command": "sudo apt-get install -y git"'
+! stdout libnotify-bin
+env WAYLAND_DISPLAY=wayland-0
+exec relay doctor check --json
+stdout '"command": "sudo apt-get install -y git libnotify-bin"'
+env WAYLAND_DISPLAY=
+env DISPLAY=:0
+cp notifier.txt notifier.json
 
 # Headless (SSH), as the plugin reports it: notify-send is of no use, the
 # notifications check points to notify_command and the guide; neither fails.
@@ -121,6 +139,8 @@ case $1 in
 --version) cat "$WORK/stubs/python3.stdout" ;;
 *) [ "$2" = notifier ] && cat "$WORK/notifier.json" ;;
 esac
+-- error.json --
+not a report
 -- headless.json --
 {"environment": {"os": "linux", "desktop": false, "ssh": true, "why": "over SSH, without a display", "tools": {"osascript": null, "notify-send": null}}, "notifier": "auto", "notify_command_set": false, "adapters": ["bell"], "reaches_you": false, "hints": ["over SSH, without a display: only the bell rings; set notify_command (Slack, ntfy…) to be reached", "options: /handover:config, or: claude plugin configure handover@fundrivendev; guide: https://github.com/FunDrivenDev/claude-plugins/blob/main/plugins/handover/docs/notifications.md"]}
 -- notifier.txt --

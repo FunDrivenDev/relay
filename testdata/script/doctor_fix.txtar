@@ -4,6 +4,7 @@
 env RELAY_GOOS=linux
 env RELAY_OS_RELEASE=$WORK/os-release
 env RELAY_EUID=1000
+env DISPLAY=:0
 stub tmux ps git notify-send curl
 exec sh -c 'cp fake-python3 bin/python3 && chmod +x bin/python3'
 exec sh -c 'mkdir -p bin "$HOME/.local/bin" && cp fake-sudo bin/sudo && chmod +x bin/sudo && cp fake-claude bin/claude && chmod +x bin/claude && bin/claude plugin install handover@fundrivendev && rm stubs.log'

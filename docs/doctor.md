@@ -21,7 +21,7 @@ commands follow [the CLI contract](contract.md).
 | `python3` | yes | on PATH, 3.9 or later | `sudo apt-get install -y python3` |
 | `ps` | yes | procps' `ps`, taking `-o ppid= -p 1` | `sudo apt-get install -y procps` |
 | `git` | no | on PATH | `sudo apt-get install -y git` |
-| `notify-send` | no | on PATH, or not needed: no Linux desktop here | `sudo apt-get install -y libnotify-bin` on a Linux desktop |
+| `notify-send` | no | on PATH, or not needed: no Linux desktop here | `sudo apt-get install -y libnotify-bin` on a Linux desktop; none without a display |
 | `handover-plugin` | yes | `handover@fundrivendev` in Claude Code's `plugins/installed_plugins.json` | `claude plugin marketplace add FunDrivenDev/claude-plugins && claude plugin install handover@fundrivendev` |
 | `notifications` | no | the plugin's alerts reach you (`reaches_you`) | the plugin's hints and its notifications guide |
 
@@ -41,7 +41,10 @@ Why these:
   alerts (a run that stops, waits or ends) as desktop notifications; Ubuntu's
   package is `libnotify-bin`. Only a Linux desktop uses it: where the plugin
   finds none (headless, SSH, WSL, macOS; its `environment.desktop`), the
-  check passes and points to `notify_command` (Slack, ntfy…) instead.
+  check passes and points to `notify_command` (Slack, ntfy…) instead. Without
+  the plugin's word (not installed yet), neither `DISPLAY` nor
+  `WAYLAND_DISPLAY` set means headless too: the check stays a `!` that says
+  why, and `libnotify-bin` is not planned.
 - **handover-plugin**: relay runs the plugin's `scripts/handover.py`, found
   through `installed_plugins.json` under `$CLAUDE_CONFIG_DIR` (else
   `~/.claude`).

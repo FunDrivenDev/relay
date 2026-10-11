@@ -199,7 +199,7 @@ func inspect(ctx context.Context, env *cli.Env) Report {
 		checkPython(ctx),
 		checkPS(ctx),
 		checkGit(ctx),
-		checkNotify(ctx, alerts, alertsErr),
+		checkNotify(ctx, env, alerts, alertsErr),
 		checkPlugin(env),
 		checkNotifications(alerts, alertsErr),
 	}
@@ -494,7 +494,9 @@ func checkGit(ctx context.Context) Check {
 
 // checkNotify checks notify-send, which only a Linux desktop uses: where the
 // plugin finds none (headless, SSH, WSL, macOS), alerts need notify_command.
-func checkNotify(ctx context.Context, alerts notifier.Report, alertsErr error) Check {
+// Without the plugin's view, no DISPLAY and no WAYLAND_DISPLAY is headless
+// too: an advisory, libnotify-bin left out of the plan.
+func checkNotify(ctx context.Context, env *cli.Env, alerts notifier.Report, alertsErr error) Check {
 	c := Check{Name: "notify-send", pkg: "libnotify-bin", step: stepApt}
 	out, found, _ := tool(ctx, "notify-send", "--version")
 	if !found {
@@ -504,6 +506,10 @@ func checkNotify(ctx context.Context, alerts notifier.Report, alertsErr error) C
 			if !alerts.ReachesYou {
 				c.Message += ": set notify_command (Slack, ntfy…) to be reached, see notifications"
 			}
+			return c
+		}
+		if env.Getenv("DISPLAY") == "" && env.Getenv("WAYLAND_DISPLAY") == "" {
+			c.Message = "not found, not installed: no display (DISPLAY, WAYLAND_DISPLAY), so no desktop alerts; set notify_command (Slack, ntfy…) to be reached"
 			return c
 		}
 		c.Message = "not found (optional: desktop alerts of AFK runs; without it, the terminal bell)"

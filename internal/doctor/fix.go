@@ -69,7 +69,8 @@ var fix = cli.New(cli.Spec{
 
   1. sudo apt-get update, then
      sudo apt-get install -y <the missing packages>  (tmux, python3, procps,
-     git, libnotify-bin; curl when Claude Code's installer needs it)
+     git, libnotify-bin on a display; curl when Claude Code's installer
+     needs it)
   2. curl -fsSL https://claude.ai/install.sh | bash   (Claude Code)
   3. claude plugin marketplace add FunDrivenDev/claude-plugins  (when unknown)
      claude plugin install handover@fundrivendev
