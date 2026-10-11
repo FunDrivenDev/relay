@@ -133,11 +133,11 @@ stdout '"name": "s1"'
 cmp stubs.log want.log
 
 -- stubs/tmux.stdout --
-s1	1	0	/home/me/proj
+s1:1:0:/home/me/proj
 -- stubs/tmux.2.exit --
 1
 -- want.log --
-tmux list-sessions -F #{session_name}	#{session_windows}	#{session_attached}	#{pane_current_path}
+tmux list-sessions -F #{session_name}:#{session_windows}:#{session_attached}:#{pane_current_path}
 ```
 
 `go test ./cmd/relay -update` rewrites the files a script compares with

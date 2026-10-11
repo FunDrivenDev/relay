@@ -84,8 +84,7 @@ windows, whether a client is attached, and the current path of its active
 pane. No tmux server running is no session.`,
 	Output: `{"sessions": [{"name", "windows", "attached", "path"}]}`,
 }, func(ctx context.Context, env *cli.Env, _ listParams) (any, error) {
-	res, err := run.Tool(ctx, "tmux", "list-sessions", "-F",
-		"#{session_name}\t#{session_windows}\t#{session_attached}\t#{pane_current_path}")
+	res, err := run.Tool(ctx, "tmux", "list-sessions", "-F", listFormat)
 	if err != nil {
 		res.Stdout = ""
 	}
@@ -96,20 +95,26 @@ pane. No tmux server running is no session.`,
 	return out, nil
 })
 
-// parseSessions reads tmux list-sessions rows: name, windows, attached
-// clients, path, separated by tabs.
+// listFormat separates the fields with ":", which tmux keeps out of session
+// names, and ends on the path, which may hold anything: tmux prints a tab (any
+// control character) in -F output as "_".
+const listFormat = "#{session_name}:#{session_windows}:#{session_attached}:#{pane_current_path}"
+
+// parseSessions reads tmux list-sessions rows (listFormat): name, windows,
+// attached clients, path.
 func parseSessions(rows string) []sessionRow {
 	out := []sessionRow{}
 	for line := range strings.SplitSeq(rows, "\n") {
 		if line == "" {
 			continue
 		}
-		f := strings.SplitN(line, "\t", 4)
+		f := strings.SplitN(line, ":", 4)
 		for len(f) < 4 {
 			f = append(f, "")
 		}
 		windows, _ := strconv.Atoi(f[1])
-		out = append(out, sessionRow{Name: f[0], Windows: windows, Attached: f[2] != "0", Path: f[3]})
+		clients, _ := strconv.Atoi(f[2])
+		out = append(out, sessionRow{Name: f[0], Windows: windows, Attached: clients > 0, Path: f[3]})
 	}
 	return out
 }

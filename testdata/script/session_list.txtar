@@ -10,7 +10,8 @@ exec relay session list --json
 cmp stdout empty.json
 ! stderr .
 
-# The rows, in both forms; the flag form and the JSON form agree.
+# The rows, in both forms; the flag form and the JSON form agree. tmux
+# prints the fields as listFormat asks, ":" between them: a path keeps its own.
 exec relay session list
 cmp stdout want.txt
 exec relay session list --json
@@ -34,15 +35,15 @@ no server running on /tmp/tmux-501/default
 -- stubs/tmux.2.exit --
 1
 -- stubs/tmux.stdout --
-s1	1	0	/home/me/proj
-afk-proj	2	1	/home/me/afk proj
+s1:1:0:/home/me/proj
+afk-proj:2:1:/home/me/afk proj:2
 -- empty.json --
 {
   "sessions": []
 }
 -- want.txt --
 s1  1 window(s)  /home/me/proj
-afk-proj  2 window(s)  (attached)  /home/me/afk proj
+afk-proj  2 window(s)  (attached)  /home/me/afk proj:2
 -- want.json --
 {
   "sessions": [
@@ -56,13 +57,13 @@ afk-proj  2 window(s)  (attached)  /home/me/afk proj
       "name": "afk-proj",
       "windows": 2,
       "attached": true,
-      "path": "/home/me/afk proj"
+      "path": "/home/me/afk proj:2"
     }
   ]
 }
 -- want.log --
-tmux list-sessions -F #{session_name}	#{session_windows}	#{session_attached}	#{pane_current_path}
-tmux list-sessions -F #{session_name}	#{session_windows}	#{session_attached}	#{pane_current_path}
-tmux list-sessions -F #{session_name}	#{session_windows}	#{session_attached}	#{pane_current_path}
-tmux list-sessions -F #{session_name}	#{session_windows}	#{session_attached}	#{pane_current_path}
-tmux list-sessions -F #{session_name}	#{session_windows}	#{session_attached}	#{pane_current_path}
+tmux list-sessions -F #{session_name}:#{session_windows}:#{session_attached}:#{pane_current_path}
+tmux list-sessions -F #{session_name}:#{session_windows}:#{session_attached}:#{pane_current_path}
+tmux list-sessions -F #{session_name}:#{session_windows}:#{session_attached}:#{pane_current_path}
+tmux list-sessions -F #{session_name}:#{session_windows}:#{session_attached}:#{pane_current_path}
+tmux list-sessions -F #{session_name}:#{session_windows}:#{session_attached}:#{pane_current_path}

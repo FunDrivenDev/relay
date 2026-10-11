@@ -85,8 +85,8 @@ func TestCreateRelayArgsAndWhere(t *testing.T) {
 
 func TestParseSessions(t *testing.T) {
 	t.Parallel()
-	got := parseSessions("a\t1\t0\t/x\nb\t2\t1\t/y z\n\n")
-	want := []sessionRow{{"a", 1, false, "/x"}, {"b", 2, true, "/y z"}}
+	got := parseSessions("a:1:0:/x\nb:2:1:/y z:2\nc\n\n")
+	want := []sessionRow{{"a", 1, false, "/x"}, {"b", 2, true, "/y z:2"}, {"c", 0, false, ""}}
 	if !slices.Equal(got, want) {
 		t.Errorf("got %+v", got)
 	}
