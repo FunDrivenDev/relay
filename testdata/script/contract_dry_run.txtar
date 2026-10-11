@@ -1,0 +1,14 @@
+# A state-changing command takes --dry-run (dry_run in JSON); others refuse it.
+
+exec relay fixture echo hi --dry-run
+stdout '^would print: hi$'
+exec relay fixture echo hi --dry-run --json
+cp stdout flags.json
+exec relay fixture echo --json='{"text": "hi", "dry_run": true}'
+cmp stdout flags.json
+stdout '"dry_run": true'
+
+exits 2 relay fixture fail x --dry-run
+stderr 'unknown option: --dry-run'
+exits 2 relay fixture fail --json='{"code": "x", "dry_run": true}'
+stderr 'unknown key: dry_run'

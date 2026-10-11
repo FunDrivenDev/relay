@@ -1,0 +1,30 @@
+# Exit codes 0/1/2 and the error envelope.
+
+# A failure: exit 1, a line for people, nothing on stdout.
+exits 1 relay fixture fail not_found
+stderr '^relay: failed with not_found$'
+! stdout .
+
+# Under --json, the envelope on stderr.
+exits 1 relay fixture fail not_found --json
+cmp stderr not_found.json
+! stdout .
+
+# A usage error returned by a command exits 2.
+exits 2 relay fixture fail usage --json
+stderr '"code":"usage"'
+exits 2 relay fixture echo hi --count=0 --json
+stderr '"code":"usage","message":"--count must be at least 1, not 0 \(relay fixture echo --help\)"'
+
+# A result printed along with the error.
+exits 1 relay fixture fail exists --result --json
+stdout '"partial": true'
+stderr '"code":"exists"'
+
+# A quiet failure: the verdict is in the output, the exit status says the rest.
+exits 1 relay fixture fail unmet --quiet --result --json
+stdout '"partial": true'
+! stderr .
+
+-- not_found.json --
+{"error":{"code":"not_found","message":"failed with not_found"}}

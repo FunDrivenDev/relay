@@ -1,0 +1,84 @@
+# --help prints the human help, --help --json the input spec; --help wins over
+# any other argument.
+
+exec relay fixture echo --help
+cmp stdout help.txt
+! stderr .
+exec relay fixture echo hello --bogus -h
+cmp stdout help.txt
+
+exec relay fixture echo --help --json
+cmp stdout spec.json
+exec relay fixture echo --json --help
+cmp stdout spec.json
+
+-- help.txt --
+Usage: relay fixture echo [--count <n>] [--mode <mode>] [--tags <tag,…>] [--loud] [--color[=<when>]] [--dry-run] <text> [-- <args>…]
+       relay fixture echo --json='{"text": "…", …}'
+
+Prints <text> --count times, and under --json every input it received.
+
+Options:
+  <text>, --text     the text to print (required)
+  -n, --count <n>    how many times (default: 1)
+  --mode <mode>      the case of the text (one of: plain, upper; default: plain)
+  --tags <tag,…>     labels, echoed back
+  --loud             ends the text with !
+  --color[=<when>]   a value given only with = (alone: auto)
+  -- <args>…         arguments passed through
+  --dry-run          validates and reports what would be done, without doing it
+  --json             JSON output: {"text", "count", "mode", "tags", "loud", "color", "args", "dry_run"}
+                     --json=<object>, or --json=- (stdin): the inputs, keys = option names in snake_case
+  -h, --help         this help; with --json, the input spec
+
+A value option takes the next argument, unless it starts with -: then write --option=<value>.
+A list option takes comma-separated values: --option=a,b.
+-- spec.json --
+{
+  "command": "relay fixture echo",
+  "summary": "prints its input back",
+  "input": {
+    "text": "string",
+    "count": "integer",
+    "mode": "string",
+    "tags": "array",
+    "loud": "boolean",
+    "color": "string",
+    "args": "array",
+    "dry_run": "boolean"
+  },
+  "positional": "text",
+  "rest": "args",
+  "short": {
+    "n": "count"
+  },
+  "required": [
+    "text"
+  ],
+  "defaults": {
+    "count": 1,
+    "mode": "plain"
+  },
+  "enum": {
+    "mode": [
+      "plain",
+      "upper"
+    ]
+  },
+  "implicit": {
+    "color": "auto"
+  },
+  "help": {
+    "text": "the text to print",
+    "count": "how many times",
+    "mode": "the case of the text",
+    "tags": "labels, echoed back",
+    "loud": "ends the text with !",
+    "color": "a value given only with =",
+    "args": "arguments passed through",
+    "dry_run": "validates and reports what would be done, without doing it"
+  },
+  "output": "{\"text\", \"count\", \"mode\", \"tags\", \"loud\", \"color\", \"args\", \"dry_run\"}",
+  "state_changing": true,
+  "interactive": false
+}

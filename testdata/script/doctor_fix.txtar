@@ -1,0 +1,299 @@
+# relay doctor fix: the plan of doctor check, run. sudo, curl and claude are
+# fakes that log their arguments and install fakes in turn.
+
+env RELAY_GOOS=linux
+env RELAY_OS_RELEASE=$WORK/os-release
+env RELAY_EUID=1000
+env DISPLAY=:0
+stub tmux ps git notify-send curl
+exec sh -c 'cp fake-python3 bin/python3 && chmod +x bin/python3'
+exec sh -c 'mkdir -p bin "$HOME/.local/bin" && cp fake-sudo bin/sudo && chmod +x bin/sudo && cp fake-claude bin/claude && chmod +x bin/claude && bin/claude plugin install handover@fundrivendev && rm stubs.log'
+
+# Nothing to fix: nothing runs.
+exec relay doctor fix --yes
+stderr '^nothing to fix$'
+stdout '^relay is ready.$'
+exec relay doctor fix --json='{"yes": true}'
+stdout '"ok": true'
+stdout '"steps": \[\]'
+rm home/.claude/plugins/installed_plugins.json
+
+# tmux, Claude Code and the plugin missing; Claude Code's installer puts it
+# in ~/.local/bin, off PATH.
+rm bin/tmux bin/claude
+
+# --dry-run: the plan, nothing run; the flag form and the JSON form agree.
+exec relay doctor fix --dry-run
+stderr '^would run sudo apt-get update$'
+stderr '^would run sudo apt-get install -y tmux$'
+stderr '^would run curl -fsSL https://claude.ai/install.sh \| bash$'
+stderr '^would run claude plugin marketplace add FunDrivenDev/claude-plugins$'
+stderr '^would run claude plugin install handover@fundrivendev$'
+stdout '^· sudo apt-get update$'
+stdout '^· sudo apt-get install -y tmux$'
+exec relay doctor fix --dry-run --json
+cp stdout flags.json
+exec relay doctor fix --json='{"dry_run": true}'
+cmp stdout flags.json
+cmp flags.json plan.json
+! grep '^(sudo|curl|claude plugin)' stubs.log
+
+# --json cannot ask: --yes or --dry-run is required.
+exits 2 relay doctor fix --json
+stderr '"code":"usage","message":"relay doctor fix --json needs --yes \(or --dry-run\)'
+# No terminal to ask on, and no --yes.
+exits 1 relay doctor fix
+stderr 'relay doctor fix asks before installing: run it on a terminal, or with --yes'
+! grep '^(sudo|curl|claude plugin)' stubs.log
+rm stubs.log
+
+# A failing step stops the fix: fix_failed, the steps after it not run.
+cp exit1.txt sudo.exit
+exits 1 relay doctor fix --yes --json
+stderr '"code":"fix_failed"'
+stdout '"name": "apt-update",\n +"command": "sudo apt-get update",\n +"ran": true,\n +"ok": false'
+stdout '"name": "packages",\n +"command": "sudo apt-get install -y tmux",\n +"ran": false'
+stdout '"name": "claude",\n +"command": "curl -fsSL https://claude.ai/install.sh \| bash",\n +"ran": false'
+cmp stubs.log failed.log
+rm sudo.exit stubs.log
+
+# --yes: every step runs, in order, the plugin's through ~/.local/bin. The
+# checks after them see the shell's PATH, where ~/.local/bin is missing: not
+# ready until it is added.
+exits 1 relay doctor fix --yes
+stderr '^running sudo apt-get update$'
+stderr '^running sudo apt-get install -y tmux$'
+stderr '^running curl -fsSL https://claude.ai/install.sh \| bash$'
+stderr 'is not on your PATH: add it to your shell''s profile'
+stdout '^✓ claude plugin install handover@fundrivendev$'
+stdout '^✓ handover-plugin +handover@fundrivendev 0.15.0$'
+stdout '^✗ claude +~/.local/bin/claude is not on PATH: add it'
+! stdout 'relay is ready'
+cmp stubs.log ran.log
+
+# Claude Code installed, ~/.local/bin still off PATH: said, not reinstalled.
+exits 1 relay doctor check
+stdout '^✗ claude +~/.local/bin/claude is not on PATH: add it'
+exits 1 relay doctor fix --dry-run --json
+stdout '"steps": \[\]'
+
+# A required check no fix can meet (Python older than 3.9): nothing runs,
+# requirements_missing.
+env PATH=$HOME/.local/bin:$PATH
+rm stubs.log
+cp python-old.txt stubs/python3.stdout
+exits 1 relay doctor fix --yes --json
+stderr '"code":"requirements_missing","message":"missing requirements: python3'
+stdout '"steps": \[\]'
+! grep '^(sudo|curl|claude plugin)' stubs.log
+
+exec relay doctor fix --help --json
+stdout '"yes": "runs the fixes without asking"'
+stdout '"state_changing": true'
+
+-- fake-python3 --
+#!/bin/sh
+# A fake python3: --version from stubs/python3.stdout, handover.py notifier
+# from notifier.json; every call logged as a stub's.
+printf 'python3' >>"$WORK/stubs.log"
+for a in "$@"; do printf ' %s' "${a##*/}" >>"$WORK/stubs.log"; done
+echo >>"$WORK/stubs.log"
+case $1 in
+--version) cat "$WORK/stubs/python3.stdout" ;;
+*) [ "$2" = notifier ] && cat "$WORK/notifier.json" ;;
+esac
+-- notifier.json --
+{"environment": {"os": "linux", "desktop": true, "ssh": false, "why": "a Linux desktop session", "tools": {"osascript": null, "notify-send": "/usr/bin/notify-send"}}, "notifier": "auto", "notify_command_set": false, "adapters": ["notify-send", "bell"], "reaches_you": true, "hints": []}
+-- os-release --
+PRETTY_NAME="Ubuntu 24.04.1 LTS"
+-- stubs/python3.stdout --
+Python 3.12.3
+-- python-old.txt --
+Python 3.8.10
+-- stubs/ps.stdout --
+ps from procps-ng 4.0.4
+-- stubs/curl.stdout --
+cp "$WORK/fake-claude" "$HOME/.local/bin/claude" && chmod +x "$HOME/.local/bin/claude"
+-- exit1.txt --
+1
+-- fake-tmux --
+#!/bin/sh
+echo tmux 3.4
+-- fake-sudo --
+#!/bin/sh
+echo "sudo $*" >>"$WORK/stubs.log"
+if [ -f "$WORK/sudo.exit" ]; then echo 'E: Unable to locate package' >&2; exit "$(cat "$WORK/sudo.exit")"; fi
+for p in "$@"; do
+	case $p in tmux) cp "$WORK/fake-tmux" "$WORK/bin/tmux" && chmod +x "$WORK/bin/tmux" ;; esac
+done
+-- fake-claude --
+#!/bin/sh
+# Logged in (auth status is not logged: the steps are what this script checks).
+if [ "$*" = 'auth status --json' ]; then
+	echo '{"loggedIn": true, "authMethod": "claude.ai", "apiProvider": "firstParty"}'
+	exit 0
+fi
+echo "claude $*" >>"$WORK/stubs.log"
+case "$*" in
+--version) echo '2.1.296 (Claude Code)' ;;
+'plugin marketplace add FunDrivenDev/claude-plugins')
+	mkdir -p "$HOME/.claude/plugins"
+	echo '{"fundrivendev": {}}' >"$HOME/.claude/plugins/known_marketplaces.json" ;;
+'plugin install handover@fundrivendev')
+	mkdir -p "$HOME/.claude/plugins" "$WORK/plugin/scripts"
+	touch "$WORK/plugin/scripts/handover.py"
+	printf '{"version": 2, "plugins": {"handover@fundrivendev": [{"installPath": "%s/plugin", "version": "0.15.0"}]}}\n' "$WORK" >"$HOME/.claude/plugins/installed_plugins.json" ;;
+esac
+-- plan.json --
+{
+  "ok": false,
+  "dry_run": true,
+  "steps": [
+    {
+      "name": "apt-update",
+      "command": "sudo apt-get update",
+      "ran": false,
+      "ok": false,
+      "error": ""
+    },
+    {
+      "name": "packages",
+      "command": "sudo apt-get install -y tmux",
+      "ran": false,
+      "ok": false,
+      "error": ""
+    },
+    {
+      "name": "claude",
+      "command": "curl -fsSL https://claude.ai/install.sh | bash",
+      "ran": false,
+      "ok": false,
+      "error": ""
+    },
+    {
+      "name": "marketplace",
+      "command": "claude plugin marketplace add FunDrivenDev/claude-plugins",
+      "ran": false,
+      "ok": false,
+      "error": ""
+    },
+    {
+      "name": "handover-plugin",
+      "command": "claude plugin install handover@fundrivendev",
+      "ran": false,
+      "ok": false,
+      "error": ""
+    }
+  ],
+  "checks": [
+    {
+      "name": "os",
+      "ok": true,
+      "required": false,
+      "version": "Ubuntu 24.04.1 LTS",
+      "message": "linux, Ubuntu 24.04.1 LTS",
+      "fix": null
+    },
+    {
+      "name": "tmux",
+      "ok": false,
+      "required": true,
+      "version": "",
+      "message": "not found on PATH",
+      "fix": "sudo apt-get install -y tmux"
+    },
+    {
+      "name": "claude",
+      "ok": false,
+      "required": true,
+      "version": "",
+      "message": "Claude Code not found on PATH",
+      "fix": "curl -fsSL https://claude.ai/install.sh | bash"
+    },
+    {
+      "name": "claude-login",
+      "ok": false,
+      "required": false,
+      "version": "",
+      "message": "skipped: Claude Code is not on PATH",
+      "fix": null
+    },
+    {
+      "name": "python3",
+      "ok": true,
+      "required": true,
+      "version": "3.12.3",
+      "message": "Python 3.12.3",
+      "fix": null
+    },
+    {
+      "name": "ps",
+      "ok": true,
+      "required": true,
+      "version": "4.0.4",
+      "message": "ps 4.0.4",
+      "fix": null
+    },
+    {
+      "name": "git",
+      "ok": true,
+      "required": false,
+      "version": "",
+      "message": "git",
+      "fix": null
+    },
+    {
+      "name": "notify-send",
+      "ok": true,
+      "required": false,
+      "version": "",
+      "message": "notify-send",
+      "fix": null
+    },
+    {
+      "name": "handover-plugin",
+      "ok": false,
+      "required": true,
+      "version": "",
+      "message": "handover@fundrivendev is not installed in Claude Code",
+      "fix": "claude plugin marketplace add FunDrivenDev/claude-plugins && claude plugin install handover@fundrivendev"
+    },
+    {
+      "name": "notifications",
+      "ok": false,
+      "required": false,
+      "version": "",
+      "message": "skipped: the handover plugin is not installed",
+      "fix": null
+    }
+  ]
+}
+-- failed.log --
+python3 --version
+ps -o ppid= -p 1
+ps --version
+git --version
+notify-send --version
+sudo apt-get update
+python3 --version
+ps -o ppid= -p 1
+ps --version
+git --version
+notify-send --version
+-- ran.log --
+python3 --version
+ps -o ppid= -p 1
+ps --version
+git --version
+notify-send --version
+sudo apt-get update
+sudo apt-get install -y tmux
+curl -fsSL https://claude.ai/install.sh
+claude plugin marketplace add FunDrivenDev/claude-plugins
+claude plugin install handover@fundrivendev
+python3 handover.py notifier
+python3 --version
+ps -o ppid= -p 1
+ps --version
+git --version
+notify-send --version

@@ -1,0 +1,34 @@
+# relay session attach: relay gives way to tmux.
+
+stub tmux
+
+# Outside tmux: attach-session; under tmux: switch-client. The stub stands for
+# tmux, which then owns the terminal.
+exec relay session attach s1
+env TMUX=/tmp/tmux-1/default,1,0
+exec relay session attach s1
+env TMUX=
+cmp stubs.log want.log
+
+# Interactive: refused under --json, naming the command to run.
+exits 1 relay session attach s1 --json
+cp stderr flags.err
+exits 1 relay session attach --json='{"name": "s1"}'
+cmp stderr flags.err
+stderr '^\{"error":\{"code":"tty_required","message":"relay session attach is interactive: run it in a terminal, without --json: relay session attach s1"\}\}$'
+
+# An unknown session.
+exits 1 relay session attach nope
+stderr '^relay: no session nope$'
+exits 2 relay session attach
+stderr 'name'
+exec relay session attach --help --json
+stdout '"interactive": true'
+
+-- stubs/tmux.5.exit --
+1
+-- want.log --
+tmux has-session -t =s1
+tmux attach-session -t =s1
+tmux has-session -t =s1
+tmux switch-client -t =s1

@@ -1,0 +1,51 @@
+# The flag form and the JSON form build the same params and run the same code:
+# their JSON outputs are identical.
+
+exec relay fixture echo hello --count 2 --mode=upper --tags a,b --loud --json
+cp stdout flags.json
+exec relay fixture echo --json='{"text": "hello", "count": 2, "mode": "upper", "tags": ["a", "b"], "loud": true}'
+cmp stdout flags.json
+cmp flags.json want.json
+! stderr .
+
+# Flags in any order; a short alias.
+exec relay fixture echo --loud --json -n 2 --tags=a,b hello --mode upper
+cmp stdout want.json
+
+# --json=- reads the object from stdin.
+stdin input.json
+exec relay fixture echo --json=-
+cmp stdout want.json
+
+# The defaults fill both forms alike.
+exec relay fixture echo hi --json
+cp stdout defaults.json
+exec relay fixture echo --json='{"text": "hi"}'
+cmp stdout defaults.json
+stdout '"count": 1,'
+stdout '"mode": "plain",'
+
+# Without --json, the human form; messages for people go to stderr.
+exec relay fixture echo hello -n 2 --mode upper --loud
+cmp stdout human.txt
+stderr '^echoing "hello"$'
+
+-- input.json --
+{"loud": true, "tags": ["a", "b"], "count": 2, "mode": "upper", "text": "hello"}
+-- human.txt --
+HELLO!
+HELLO!
+-- want.json --
+{
+  "text": "hello",
+  "count": 2,
+  "mode": "upper",
+  "tags": [
+    "a",
+    "b"
+  ],
+  "loud": true,
+  "color": "",
+  "args": [],
+  "dry_run": false
+}

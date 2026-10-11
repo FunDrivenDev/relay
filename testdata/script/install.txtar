@@ -1,0 +1,106 @@
+# install.sh: downloads a release with curl (a fake serving srv/), checks its
+# sha256, installs relay in ~/.local/bin, runs relay doctor check.
+
+exec sh -c 'cp fake-curl bin/curl && cp fake-uname bin/uname && chmod +x bin/curl bin/uname'
+exec sh -c 'mkdir -p pkg srv && cp fake-relay pkg/relay && chmod +x pkg/relay && tar -czf srv/relay_linux_amd64.tar.gz -C pkg relay && cd srv && { sha256sum relay_linux_amd64.tar.gz 2>/dev/null || shasum -a 256 relay_linux_amd64.tar.gz; } >checksums.txt'
+
+# The latest release, for amd64: installed, a warning for PATH, the doctor run.
+exec sh $REPO/install.sh
+stderr '^downloading relay \(latest, linux amd64\)$'
+stderr '^installed relay 1.2.3 in '$HOME'/.local/bin$'
+stderr 'warning: '$HOME'/.local/bin is not on PATH'
+stderr '^doctor check ran$'
+! stderr 'relay doctor fix'
+exists $HOME/.local/bin/relay
+cmp curl.log latest.log
+rm curl.log
+
+# Run again: an update, in place. A doctor that fails is not a failure, and
+# its own hint is enough.
+env RELAY_DOCTOR_EXIT=1
+env PATH=$HOME/.local/bin:$PATH
+exec sh $REPO/install.sh
+stderr '^doctor check ran$'
+! stderr 'to install what is missing'
+! stderr 'is not on PATH'
+env RELAY_DOCTOR_EXIT=
+rm curl.log
+
+# RELAY_VERSION and RELAY_INSTALL_DIR.
+env RELAY_VERSION=v1.2.3
+env RELAY_INSTALL_DIR=$WORK/opt
+exec sh $REPO/install.sh
+stderr '^downloading relay \(1.2.3, linux amd64\)$'
+exists $WORK/opt/relay
+cmp curl.log pinned.log
+env RELAY_VERSION=
+env RELAY_INSTALL_DIR=
+rm curl.log
+
+# RELAY_BASE_URL: another place to download from, checked the same way.
+env RELAY_BASE_URL=http://127.0.0.1:8000/dist/
+exec sh $REPO/install.sh
+stderr '^downloading relay \(from http://127.0.0.1:8000/dist, linux amd64\)$'
+cmp curl.log base.log
+env RELAY_BASE_URL=
+rm curl.log
+
+# A checksum that does not match: nothing installed, from a release or
+# RELAY_BASE_URL.
+rm $HOME/.local/bin/relay
+exec sh -c 'printf "%s  relay_linux_amd64.tar.gz\n" 0000 >srv/checksums.txt'
+! exec sh $REPO/install.sh
+stderr '^relay install: checksum mismatch for relay_linux_amd64.tar.gz'
+! exists $HOME/.local/bin/relay
+env RELAY_BASE_URL=http://127.0.0.1:8000/dist
+! exec sh $REPO/install.sh
+stderr '^relay install: checksum mismatch for relay_linux_amd64.tar.gz'
+! exists $HOME/.local/bin/relay
+env RELAY_BASE_URL=
+
+# arm64 maps to its archive; other machines and systems are refused.
+env UNAME_M=aarch64
+! exec sh $REPO/install.sh
+stderr 'downloading relay \(latest, linux arm64\)'
+stderr 'cannot download https://github.com/FunDrivenDev/relay/releases/latest/download/relay_linux_arm64.tar.gz'
+env UNAME_M=riscv64
+! exec sh $REPO/install.sh
+stderr '^relay install: no relay build for riscv64: amd64 and arm64 only$'
+env UNAME_M=
+env UNAME_S=Darwin
+! exec sh $REPO/install.sh
+stderr '^relay install: relay is built for Linux, not Darwin$'
+
+-- fake-uname --
+#!/bin/sh
+case $1 in
+-s) echo "${UNAME_S:-Linux}" ;;
+-m) echo "${UNAME_M:-x86_64}" ;;
+esac
+-- fake-curl --
+#!/bin/sh
+# curl -fsSL -o <file> <url>: serves $WORK/srv/<the url's basename>.
+echo "curl $1 $2 <tmp> $4" >>"$WORK/curl.log"
+out=$3
+url=$4
+file="$WORK/srv/${url##*/}"
+[ -f "$file" ] || exit 22
+cp "$file" "$out"
+-- fake-relay --
+#!/bin/sh
+case $* in
+--version) echo 'relay 1.2.3' ;;
+'doctor check')
+	echo 'doctor check ran' >&2
+	exit "${RELAY_DOCTOR_EXIT:-0}"
+	;;
+esac
+-- latest.log --
+curl -fsSL -o <tmp> https://github.com/FunDrivenDev/relay/releases/latest/download/relay_linux_amd64.tar.gz
+curl -fsSL -o <tmp> https://github.com/FunDrivenDev/relay/releases/latest/download/checksums.txt
+-- pinned.log --
+curl -fsSL -o <tmp> https://github.com/FunDrivenDev/relay/releases/download/v1.2.3/relay_linux_amd64.tar.gz
+curl -fsSL -o <tmp> https://github.com/FunDrivenDev/relay/releases/download/v1.2.3/checksums.txt
+-- base.log --
+curl -fsSL -o <tmp> http://127.0.0.1:8000/dist/relay_linux_amd64.tar.gz
+curl -fsSL -o <tmp> http://127.0.0.1:8000/dist/checksums.txt

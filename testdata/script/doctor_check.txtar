@@ -1,0 +1,323 @@
+# relay doctor check: what relay needs, checked without changing anything.
+# Every tool is a stub; RELAY_GOOS and RELAY_OS_RELEASE stand for the host,
+# RELAY_EUID for the user id, so nothing depends on the machine running it.
+
+env RELAY_GOOS=linux
+env RELAY_OS_RELEASE=$WORK/os-release
+env RELAY_EUID=1000
+env DISPLAY=:0
+stub tmux ps git notify-send
+exec sh -c 'cp fake-python3 bin/python3 && cp fake-claude bin/claude && chmod +x bin/python3 bin/claude'
+exec sh -c 'mkdir -p "$HOME/.claude/plugins" "$WORK/plugin/scripts" && touch "$WORK/plugin/scripts/handover.py" && sed "s|@WORK@|$WORK|" installed.json >"$HOME/.claude/plugins/installed_plugins.json" && cp known.json "$HOME/.claude/plugins/known_marketplaces.json"'
+
+# All met: the checklist, exit 0; the flag form and the JSON form agree.
+exec relay doctor check
+cmp stdout ok.txt
+! stderr .
+exec relay doctor check --json
+cmp stdout ok.json
+! stderr .
+exec relay doctor check --json='{}'
+cmp stdout ok.json
+
+# Elsewhere than Linux: a warning, never a failure.
+env RELAY_GOOS=darwin
+exec relay doctor check
+stdout '^! os +darwin: relay is made for Linux'
+stdout 'relay is ready.'
+# There, no apt-get fix.
+rm bin/notify-send
+exec relay doctor check --json
+stdout '"name": "notify-send",\n +"ok": false,\n +"required": false,\n +"version": "",\n +"message": "[^"]*",\n +"fix": null'
+stdout '"fixes": \[\]'
+stub notify-send
+env RELAY_GOOS=linux
+
+# The optional tools missing: warnings, and their packages in the plan.
+rm bin/git bin/notify-send
+exec relay doctor check --json
+stdout '"ok": true'
+stdout '"command": "sudo apt-get install -y git libnotify-bin"'
+exec relay doctor check
+stdout '^! notify-send +not found \(optional: desktop alerts of AFK runs; without it, the terminal bell\)$'
+stdout '^ +sudo apt-get install -y libnotify-bin$'
+stdout 'relay doctor fix'
+
+# No DISPLAY, no WAYLAND_DISPLAY, and no word from the plugin: headless, so
+# notify-send is an advisory and libnotify-bin stays out of the plan.
+env DISPLAY=
+cp error.json notifier.json
+exec relay doctor check
+stdout '^! notify-send +not found, not installed: no display \(DISPLAY, WAYLAND_DISPLAY\)'
+! stdout libnotify-bin
+exec relay doctor check --json
+stdout '"command": "sudo apt-get install -y git"'
+! stdout libnotify-bin
+env WAYLAND_DISPLAY=wayland-0
+exec relay doctor check --json
+stdout '"command": "sudo apt-get install -y git libnotify-bin"'
+env WAYLAND_DISPLAY=
+env DISPLAY=:0
+cp notifier.txt notifier.json
+
+# Headless (SSH), as the plugin reports it: notify-send is of no use, the
+# notifications check points to notify_command and the guide; neither fails.
+cp headless.json notifier.json
+exec relay doctor check
+stdout '^✓ notify-send +not used here \(over SSH, without a display\): set notify_command \(Slack, ntfy…\) to be reached, see notifications$'
+stdout '^! notifications +linux, headless, over SSH \(over SSH, without a display\): bell$'
+stdout '^ +over SSH, without a display: only the bell rings; set notify_command \(Slack, ntfy…\) to be reached$'
+stdout '^ +options: .*; guide: https://github.com/FunDrivenDev/claude-plugins/blob/main/plugins/handover/docs/notifications.md$'
+exec relay doctor check --json
+stdout '"command": "sudo apt-get install -y git"'
+! stdout libnotify-bin
+cp notifier.txt notifier.json
+stub git notify-send
+
+# tmux missing: a required check fails, exit 1 (requirements_missing); the
+# report stays on stdout, under --json too. As root, no sudo.
+rm bin/tmux
+exits 1 relay doctor check
+stdout '^✗ tmux +not found on PATH$'
+stdout '^ +sudo apt-get install -y tmux$'
+! stderr .
+env RELAY_EUID=0
+exits 1 relay doctor check --json
+stdout '"ok": false'
+stdout '"fixes": \[\n +\{\n +"name": "apt-update",\n +"command": "apt-get update"\n +\},\n +\{\n +"name": "packages",\n +"command": "apt-get install -y tmux"'
+cmp stderr missing.json
+env RELAY_EUID=1000
+stub tmux
+
+# tmux older than 3.2 (new-session -e): no automatic fix.
+cp tmux-old.txt stubs/tmux.stdout
+exits 1 relay doctor check --json
+stdout '"message": "tmux 3.0a is older than 3.2 \(new-session -e\)'
+stdout '"fix": null'
+stdout '"fixes": \[\]'
+cp tmux.txt stubs/tmux.stdout
+
+# Python older than 3.9 (str.removeprefix): no automatic fix either.
+cp python-old.txt stubs/python3.stdout
+exits 1 relay doctor check
+stdout '^✗ python3 +Python 3.8.10 is older than 3.9'
+cp python.txt stubs/python3.stdout
+
+# Claude Code missing, curl too: curl joins the packages, then the installer.
+rm bin/claude
+exits 1 relay doctor check --json
+stdout '"command": "sudo apt-get install -y curl"'
+stdout '"command": "curl -fsSL https://claude.ai/install.sh \| bash"'
+# The login check is skipped then: the claude check says it all.
+stdout '"name": "claude-login",\n +"ok": false,\n +"required": false,\n +"version": "",\n +"message": "skipped: Claude Code is not on PATH"'
+stderr '"message":"missing requirements: claude \(relay doctor fix\)"'
+exec sh -c 'cp fake-claude bin/claude && chmod +x bin/claude'
+
+# Claude Code not logged in: a required check with no fix, only the hint.
+cp logged-out.json auth.json
+exits 1 relay doctor check
+stdout '^✗ claude-login +not logged in: run claude once to sign in \(or claude auth login\); headless: claude setup-token, then export CLAUDE_CODE_OAUTH_TOKEN, or set ANTHROPIC_API_KEY$'
+! stdout 'relay doctor fix'
+exits 1 relay doctor check --json
+stdout '"fixes": \[\]'
+stderr '"message":"missing requirements: claude-login \(no automatic fix: relay doctor check says what to do\)"'
+# Logged in through the environment (ANTHROPIC_API_KEY, here), as Claude
+# Code reports it.
+cp api-key.json auth.json
+exec relay doctor check
+stdout '^✓ claude-login +logged in \(api_key\)$'
+# A Claude Code without auth status: no verdict, not a failure.
+cp no-status.txt auth.json
+exec relay doctor check
+stdout '^! claude-login +unknown: claude auth status gave no status'
+rm auth.json
+
+# The plugin missing, its marketplace known: only the install.
+rm home/.claude/plugins/installed_plugins.json
+exits 1 relay doctor check
+stdout '^✗ handover-plugin +handover@fundrivendev is not installed in Claude Code$'
+stdout '^ +claude plugin install handover@fundrivendev$'
+stdout '^! notifications +skipped: the handover plugin is not installed$'
+# The marketplace unknown too: added first.
+rm home/.claude/plugins/known_marketplaces.json
+exits 1 relay doctor check --json
+stdout '"fix": "claude plugin marketplace add FunDrivenDev/claude-plugins && claude plugin install handover@fundrivendev"'
+stdout '"name": "marketplace",\n +"command": "claude plugin marketplace add FunDrivenDev/claude-plugins"'
+
+# Read-only: no --dry-run; --help --json describes the output.
+exits 2 relay doctor check --dry-run
+stderr 'unknown option: --dry-run'
+exec relay doctor check --help --json
+stdout '"output": "\{\\"ok\\", \\"os\\", \\"distro\\"'
+
+-- fake-python3 --
+#!/bin/sh
+# A fake python3: --version from stubs/python3.stdout, handover.py notifier
+# from notifier.json; every call logged as a stub's.
+printf 'python3' >>"$WORK/stubs.log"
+for a in "$@"; do printf ' %s' "${a##*/}" >>"$WORK/stubs.log"; done
+echo >>"$WORK/stubs.log"
+case $1 in
+--version) cat "$WORK/stubs/python3.stdout" ;;
+*) [ "$2" = notifier ] && cat "$WORK/notifier.json" ;;
+esac
+-- error.json --
+not a report
+-- headless.json --
+{"environment": {"os": "linux", "desktop": false, "ssh": true, "why": "over SSH, without a display", "tools": {"osascript": null, "notify-send": null}}, "notifier": "auto", "notify_command_set": false, "adapters": ["bell"], "reaches_you": false, "hints": ["over SSH, without a display: only the bell rings; set notify_command (Slack, ntfy…) to be reached", "options: /handover:config, or: claude plugin configure handover@fundrivendev; guide: https://github.com/FunDrivenDev/claude-plugins/blob/main/plugins/handover/docs/notifications.md"]}
+-- notifier.txt --
+{"environment": {"os": "linux", "desktop": true, "ssh": false, "why": "a Linux desktop session", "tools": {"osascript": null, "notify-send": "/usr/bin/notify-send"}}, "notifier": "auto", "notify_command_set": false, "adapters": ["notify-send", "bell"], "reaches_you": true, "hints": []}
+-- notifier.json --
+{"environment": {"os": "linux", "desktop": true, "ssh": false, "why": "a Linux desktop session", "tools": {"osascript": null, "notify-send": "/usr/bin/notify-send"}}, "notifier": "auto", "notify_command_set": false, "adapters": ["notify-send", "bell"], "reaches_you": true, "hints": []}
+-- os-release --
+NAME="Ubuntu"
+VERSION="24.04.1 LTS (Noble Numbat)"
+PRETTY_NAME="Ubuntu 24.04.1 LTS"
+-- installed.json --
+{"version": 2, "plugins": {"handover@fundrivendev": [{"scope": "user", "installPath": "@WORK@/plugin", "version": "0.15.0"}]}}
+-- known.json --
+{"fundrivendev": {"source": {"source": "github", "repo": "FunDrivenDev/claude-plugins"}}}
+-- stubs/tmux.stdout --
+tmux 3.4
+-- tmux.txt --
+tmux 3.4
+-- tmux-old.txt --
+tmux 3.0a
+-- fake-claude --
+#!/bin/sh
+# A fake claude: --version, and auth status from auth.json (logged in through
+# a claude.ai account without it), exiting 1 when not logged in.
+case "$*" in
+--version) echo '2.1.296 (Claude Code)' ;;
+'auth status --json')
+	if [ -f "$WORK/auth.json" ]; then
+		cat "$WORK/auth.json"
+		grep -q '"loggedIn": false' "$WORK/auth.json" && exit 1
+	else
+		echo '{"loggedIn": true, "authMethod": "claude.ai", "apiProvider": "firstParty"}'
+	fi
+	;;
+esac
+exit 0
+-- logged-out.json --
+{"loggedIn": false, "authMethod": "none", "apiProvider": "firstParty"}
+-- api-key.json --
+{"loggedIn": true, "authMethod": "api_key", "apiProvider": "firstParty", "apiKeySource": "ANTHROPIC_API_KEY"}
+-- no-status.txt --
+error: unknown command 'auth'
+-- stubs/python3.stdout --
+Python 3.12.3
+-- python.txt --
+Python 3.12.3
+-- python-old.txt --
+Python 3.8.10
+-- stubs/ps.stdout --
+ps from procps-ng 4.0.4
+-- stubs/git.stdout --
+git version 2.43.0
+-- stubs/notify-send.stdout --
+notify-send 0.8.3
+-- missing.json --
+{"error":{"code":"requirements_missing","message":"missing requirements: tmux (relay doctor fix)"}}
+-- ok.txt --
+✓ os               linux, Ubuntu 24.04.1 LTS
+✓ tmux             tmux 3.4
+✓ claude           Claude Code 2.1.296
+✓ claude-login     logged in (claude.ai)
+✓ python3          Python 3.12.3
+✓ ps               ps 4.0.4
+✓ git              git 2.43.0
+✓ notify-send      notify-send 0.8.3
+✓ handover-plugin  handover@fundrivendev 0.15.0
+✓ notifications    linux, desktop (a Linux desktop session): notify-send, bell
+
+relay is ready.
+-- ok.json --
+{
+  "ok": true,
+  "os": "linux",
+  "distro": "Ubuntu 24.04.1 LTS",
+  "checks": [
+    {
+      "name": "os",
+      "ok": true,
+      "required": false,
+      "version": "Ubuntu 24.04.1 LTS",
+      "message": "linux, Ubuntu 24.04.1 LTS",
+      "fix": null
+    },
+    {
+      "name": "tmux",
+      "ok": true,
+      "required": true,
+      "version": "3.4",
+      "message": "tmux 3.4",
+      "fix": null
+    },
+    {
+      "name": "claude",
+      "ok": true,
+      "required": true,
+      "version": "2.1.296",
+      "message": "Claude Code 2.1.296",
+      "fix": null
+    },
+    {
+      "name": "claude-login",
+      "ok": true,
+      "required": true,
+      "version": "claude.ai",
+      "message": "logged in (claude.ai)",
+      "fix": null
+    },
+    {
+      "name": "python3",
+      "ok": true,
+      "required": true,
+      "version": "3.12.3",
+      "message": "Python 3.12.3",
+      "fix": null
+    },
+    {
+      "name": "ps",
+      "ok": true,
+      "required": true,
+      "version": "4.0.4",
+      "message": "ps 4.0.4",
+      "fix": null
+    },
+    {
+      "name": "git",
+      "ok": true,
+      "required": false,
+      "version": "2.43.0",
+      "message": "git 2.43.0",
+      "fix": null
+    },
+    {
+      "name": "notify-send",
+      "ok": true,
+      "required": false,
+      "version": "0.8.3",
+      "message": "notify-send 0.8.3",
+      "fix": null
+    },
+    {
+      "name": "handover-plugin",
+      "ok": true,
+      "required": true,
+      "version": "0.15.0",
+      "message": "handover@fundrivendev 0.15.0",
+      "fix": null
+    },
+    {
+      "name": "notifications",
+      "ok": true,
+      "required": false,
+      "version": "",
+      "message": "linux, desktop (a Linux desktop session): notify-send, bell",
+      "fix": null
+    }
+  ],
+  "fixes": []
+}

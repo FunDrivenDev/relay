@@ -1,0 +1,270 @@
+# relay session create: Claude Code under the relay
+# (relay session run), in a tmux session. tmux, claude and python3 are fakes
+# (setup.sh, fake/); the option cases, then each place it runs.
+
+exec sh setup.sh
+
+# Without the handover plugin: relay_missing (a dry run does not need it).
+exits 1 relay session create --name s0 --json
+stderr '^\{"error":\{"code":"relay_missing","message":"handover@fundrivendev is not installed"\}\}$'
+exec relay session create --name s0 --dry-run --json
+env CLAUDE_CONFIG_DIR=$WORK/claude
+exec sh reset.sh
+
+# A detached session: tmux starts the relay with the prompt, in --dir.
+exec relay session create --name s1 --detach --dir proj hello
+stderr '^session s1 created \(relay session attach s1\)$'
+! stdout .
+cmpenv stubs.log want/s1.log
+
+# --json implies --detach; the relay gets its arguments in canonical order.
+exec sh reset.sh
+exec relay session create --json='{"name": "s2", "afk": true, "yolo": true, "prompt": "goal", "args": ["--model", "opus"]}'
+cmpenv stdout want/s2.json
+grep '^tmux new-session -d -s s2 -c '${WORK@R}' RELAY_EXE session run --afk goal --yolo --model opus ; set-option destroy-unattached off$' stubs.log
+exec relay session create --name s3 --afk --yolo goal --detach
+grep '^tmux new-session -d -s s3 -c '${WORK@R}' RELAY_EXE session run --afk goal --yolo ;' stubs.log
+
+# The same session keys in a dry run, but attached; the would-run line on
+# stderr without --json.
+exec relay session create --name s5 --dry-run --json
+cmpenv stdout want/s5.json
+exec relay session create --dry-run x
+stderr '^would run \(tab\) in '${WORK@R}': relay session run x$'
+! stdout .
+exec relay session create --dry-run --dir proj -- --model 'two words'
+stderr '^would run \(tab\) in '${WORK@R}'/proj: relay session run --model ''two words''$'
+
+# Flags in any order, and the JSON form, give the same relay arguments.
+exec relay session create --name s9 --afk --yolo --until 8 goal --dry-run --json
+cp stdout order1.json
+exec relay session create --yolo --afk goal --until 8 --name s9 --dry-run --json
+cmp stdout order1.json
+exec relay session create goal --until 8 --afk --yolo --name s9 --dry-run --json
+cmp stdout order1.json
+exec relay session create --json='{"name": "s9", "afk": true, "yolo": true, "until": "8", "prompt": "goal", "dry_run": true}'
+cmp stdout order1.json
+stdin input.json
+exec relay session create --json=-
+cmp stdout order1.json
+cmpenv order1.json want/s9.json
+
+# Errors.
+exits 1 relay session create --name s1 --json
+stderr '^\{"error":\{"code":"exists","message":"session s1 already exists: relay session attach s1"\}\}$'
+exits 1 relay session create --name s9 --dir nope --json
+stderr '"code":"not_found","message":"no such directory: nope"'
+exits 2 relay session create --name --afk x
+stderr '--name expects a value'
+exec relay session create --name=-x --dry-run --json
+stdout '"name": "-x"'
+exits 2 relay session create --name s9 --afk --detach
+stderr 'requires a goal'
+exits 2 relay session create --name s9 --yolo --detach x
+stderr '--yolo requires --afk'
+exits 2 relay session create --name s9 --until 8 --detach x
+stderr '--until requires --afk'
+exits 2 relay session create --model opus
+stderr 'unknown option: --model'
+exits 2 relay session create a b
+stderr 'extra: b'
+exits 2 relay session create --json='{"name": "s9", "afk": "yes"}'
+stderr '"code":"usage"'
+stderr 'afk'
+exits 2 relay session create --json='{"model": "opus"}'
+stderr 'unknown key: model'
+exits 2 relay session create --json='{"name": "s9"}' --detach
+stderr '"code":"usage"'
+exits 2 relay session create --json
+stderr 'requires --name'
+exec relay session create --help --json
+stdout '"afk": "boolean"'
+stdout '"state_changing": true'
+
+# Claude Code not logged in: an AFK run is refused before tmux starts, since
+# it cannot sign in; any other session starts, with a note.
+exec sh reset.sh
+cp logged-out.json auth.json
+exits 1 relay session create --name s4 --afk goal --json
+stderr '^\{"error":\{"code":"not_logged_in","message":"Claude Code is not logged in, and an AFK run cannot sign in: run claude once to sign in'
+! grep new-session stubs.log
+exec relay session create --name s4 --detach hi
+stderr '^note Claude Code is not logged in: it will ask you to sign in$'
+stderr '^session s4 created'
+exec relay session create --name s6 --afk goal --dry-run --json
+! stderr .
+# A Claude Code that gives no status: no verdict, no refusal.
+cp no-status.txt auth.json
+exec relay session create --name s10 --afk goal --json
+! stderr .
+rm auth.json
+
+# Attached, outside tmux: a named session on this terminal, which runs the
+# relay; already in tmux, the relay asks for no new session.
+exec sh reset.sh
+exec relay session create --name s7 --dir proj -- --model opus
+cmpenv stubs.log want/s7.log
+cmp claude.log want/s7.claude
+
+# Under tmux with --name: the current session renamed, kept when the tab
+# closes; the relay then runs in this pane with HANDOVER_RELAY_OWN emptied.
+exec sh reset.sh
+env TMUX=/tmp/tmux-1/default,1,0 TMUX_PANE=%3 HANDOVER_RELAY_OWN=1
+exec relay session create --name s8 --dir proj hi
+cmp stubs.log want/s8.log
+cmp claude.log want/s8.claude
+
+# Under tmux without --name: in the current pane.
+exec sh reset.sh
+env HANDOVER_RELAY_OWN=
+exec relay session create hi
+! exists stubs.log
+grep '^call 1 in script-session_create$' claude.log
+grep '^  env TMUX_PANE=%3$' claude.log
+
+# Outside tmux without --name: a session tied to the tab (the relay's own).
+exec sh reset.sh
+env TMUX= TMUX_PANE=
+exec relay session create --dir proj hi
+cmpenv stubs.log want/tab.log
+grep '^  env HANDOVER_RELAY_OWN=1$' claude.log
+
+-- setup.sh --
+set -e
+for f in tmux claude python3; do cp "fake/$f" "bin/$f" && chmod +x "bin/$f"; done
+mkdir -p proj claude/plugins handover/scripts
+: >handover/scripts/handover.py
+printf '{"plugins": {"handover@fundrivendev": [{"installPath": "%s/handover"}]}}\n' "$WORK" >claude/plugins/installed_plugins.json
+-- logged-out.json --
+{"loggedIn": false, "authMethod": "none", "apiProvider": "firstParty"}
+-- no-status.txt --
+error: unknown command 'auth'
+-- reset.sh --
+rm -f stubs.log claude.log .claude.calls
+-- input.json --
+{"name": "s9", "prompt": "goal", "afk": true, "until": "8", "yolo": true, "dry_run": true}
+-- fake/tmux --
+#!/usr/bin/env bash
+# A fake tmux: logs each call to $WORK/stubs.log (the relay executable as
+# RELAY_EXE), knows the sessions listed in $WORK/tmux-sessions, and runs the
+# command of a new attached session as tmux would: in its -c directory, with
+# its -e variables, TMUX and TMUX_PANE set.
+{
+	printf tmux
+	for a in "$@"; do
+		case $a in */relay) a=RELAY_EXE ;; esac
+		printf ' %s' "$a"
+	done
+	echo
+} >>"$WORK/stubs.log"
+case $1 in
+	has-session) grep -qx -- "${3#=}" "$WORK/tmux-sessions" 2>/dev/null; exit ;;
+	new-session) shift ;;
+	*) exit 0 ;;
+esac
+detach=""
+while (($#)); do
+	case $1 in
+		-d) detach=1 && shift ;;
+		-s) echo "$2" >>"$WORK/tmux-sessions" && shift 2 ;;
+		-c) cd "$2" && shift 2 ;;
+		-e) export "${2?}" && shift 2 ;;
+		*) break ;;
+	esac
+done
+cmd=()
+while (($#)) && [[ $1 != ";" ]]; do cmd+=("$1") && shift; done
+[[ -z $detach ]] || exit 0
+export TMUX=/tmp/tmux-1/default,1,0 TMUX_PANE=%1 PWD=$PWD
+exec "${cmd[@]}"
+-- fake/claude --
+#!/usr/bin/env bash
+# A fake claude: logs its arguments, its directory and the relay's environment.
+# claude auth status answers from $WORK/auth.json (logged in without it),
+# unlogged, exiting 1 when not logged in as Claude Code does.
+if [[ "$1 $2" == "auth status" ]]; then
+	if [[ -f "$WORK/auth.json" ]]; then
+		cat "$WORK/auth.json"
+		grep -q '"loggedIn": false' "$WORK/auth.json" && exit 1
+	else
+		echo '{"loggedIn": true, "authMethod": "claude.ai", "apiProvider": "firstParty"}'
+	fi
+	exit 0
+fi
+n=$(($(cat "$WORK/.claude.calls" 2>/dev/null || echo 0) + 1))
+echo "$n" >"$WORK/.claude.calls"
+{
+	echo "call $n in ${PWD##*/}"
+	for a in "$@"; do echo "  arg $a"; done
+	env | grep -E '^(HANDOVER_[A-Z_]*|TMUX|TMUX_PANE)=' | sort | while IFS= read -r kv; do
+		case $kv in TMUX=?*) kv="TMUX=<set>" ;; esac
+		echo "  env $kv"
+	done
+} >>"$WORK/claude.log"
+-- fake/python3 --
+#!/usr/bin/env bash
+echo "python3 ${1##*/} $2" >>"$WORK/stubs.log"
+-- want/s1.log --
+tmux has-session -t =s1
+tmux new-session -d -s s1 -c $WORK/proj RELAY_EXE session run hello ; set-option destroy-unattached off
+-- want/s2.json --
+{
+  "session": {
+    "name": "s2",
+    "path": "$WORK",
+    "afk": true,
+    "where": "detached",
+    "attached": false
+  }
+}
+-- want/s5.json --
+{
+  "dry_run": true,
+  "session": {
+    "name": "s5",
+    "path": "$WORK",
+    "afk": false,
+    "where": "detached"
+  },
+  "relay_args": []
+}
+-- want/s9.json --
+{
+  "dry_run": true,
+  "session": {
+    "name": "s9",
+    "path": "$WORK",
+    "afk": true,
+    "where": "detached"
+  },
+  "relay_args": [
+    "--afk",
+    "goal",
+    "--until",
+    "8",
+    "--yolo"
+  ]
+}
+-- want/s7.log --
+tmux has-session -t =s7
+tmux new-session -s s7 -c $WORK/proj RELAY_EXE session run --model opus ; set-option destroy-unattached off
+-- want/s7.claude --
+call 1 in proj
+  arg --model
+  arg opus
+  env HANDOVER_RELAY=1
+  env TMUX=<set>
+  env TMUX_PANE=%1
+-- want/s8.log --
+tmux has-session -t =s8
+tmux rename-session -- s8 ; set-option destroy-unattached off ; set-environment -u HANDOVER_RELAY_OWN
+-- want/s8.claude --
+call 1 in proj
+  arg hi
+  env HANDOVER_RELAY=1
+  env HANDOVER_RELAY_OWN=
+  env TMUX=<set>
+  env TMUX_PANE=%3
+-- want/tab.log --
+tmux new-session -c $WORK/proj -e HANDOVER_RELAY_OWN=1 RELAY_EXE session run hi
+tmux set-option -t %1 destroy-unattached on

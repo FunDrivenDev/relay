@@ -1,0 +1,36 @@
+# --json=<object>: the whole input, checked key by key.
+
+exits 2 relay fixture echo --json='{"text": "hi", "bogus": 1}'
+stderr '^\{"error":\{"code":"usage","message":"unknown key: bogus \(relay fixture echo --help\)"\}\}$'
+
+exits 2 relay fixture echo --json='{"text": 1}'
+stderr '"message":"text: expected a string'
+exits 2 relay fixture echo --json='{"text": "hi", "count": 1.5}'
+stderr 'count: expected an integer'
+exits 2 relay fixture echo --json='{"text": "hi", "tags": "a"}'
+stderr 'tags: expected an array of strings'
+exits 2 relay fixture echo --json='{"text": "hi", "loud": "yes"}'
+stderr 'loud: expected a boolean'
+exits 2 relay fixture echo --json='{"count": 1}'
+stderr 'missing key text'
+exits 2 relay fixture echo --json='{"text": "hi", "mode": "shout"}'
+stderr 'key mode: \\"shout\\" is not one of plain, upper'
+exits 2 relay fixture echo --json='[1]'
+stderr '--json expects a JSON object'
+exits 2 relay fixture echo --json='{"text": "hi"} {}'
+stderr '--json expects a single JSON object'
+exits 2 relay fixture echo --json=
+stderr '--json expects a JSON object'
+
+# Mixing --json=<object> with flags or arguments is a usage error.
+exits 2 relay fixture echo --loud --json='{"text": "hi"}'
+stderr 'carries all the inputs: no other option or argument allowed'
+exits 2 relay fixture echo hi --json='{"text": "hi"}'
+stderr 'carries all the inputs'
+exits 2 relay fixture echo --json --json='{"text": "hi"}'
+stderr 'repeated option: --json'
+
+# The rest and dry_run keys.
+exec relay fixture echo --json='{"text": "hi", "args": ["-x"], "dry_run": true}'
+stdout '"-x"'
+stdout '"dry_run": true'

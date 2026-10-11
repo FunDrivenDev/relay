@@ -1,0 +1,4 @@
+# Markdown lint (rumdl).
+[global]
+# Tables and links run past any line length.
+disable = ["MD013"]
