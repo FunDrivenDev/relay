@@ -21,8 +21,9 @@ commands follow [the CLI contract](contract.md).
 | `python3` | yes | on PATH, 3.9 or later | `sudo apt-get install -y python3` |
 | `ps` | yes | procps' `ps`, taking `-o ppid= -p 1` | `sudo apt-get install -y procps` |
 | `git` | no | on PATH | `sudo apt-get install -y git` |
-| `notify-send` | no | on PATH | `sudo apt-get install -y libnotify-bin` |
+| `notify-send` | no | on PATH, or not needed: no Linux desktop here | `sudo apt-get install -y libnotify-bin` on a Linux desktop |
 | `handover-plugin` | yes | `handover@fundrivendev` in Claude Code's `plugins/installed_plugins.json` | `claude plugin marketplace add FunDrivenDev/claude-plugins && claude plugin install handover@fundrivendev` |
+| `notifications` | no | the plugin's alerts reach you (`reaches_you`) | the plugin's hints and its notifications guide |
 
 Why these:
 
@@ -37,14 +38,19 @@ Why these:
 - **git**, optional: `handover.py` reads the repository for the handover's
   context; without git it writes the handover all the same.
 - **notify-send**, optional: the handover plugin's Linux notifier sends AFK
-  alerts (a run that stops, waits or ends) as desktop notifications. Without
-  it, or with no desktop (over SSH), the alerts fall back to the terminal
-  bell. Ubuntu's package is `libnotify-bin`.
+  alerts (a run that stops, waits or ends) as desktop notifications; Ubuntu's
+  package is `libnotify-bin`. Only a Linux desktop uses it: where the plugin
+  finds none (headless, SSH, WSL, macOS; its `environment.desktop`), the
+  check passes and points to `notify_command` (Slack, ntfy…) instead.
 - **handover-plugin**: relay runs the plugin's `scripts/handover.py`, found
   through `installed_plugins.json` under `$CLAUDE_CONFIG_DIR` (else
   `~/.claude`).
+- **notifications**, optional: the plugin's `handover.py notifier` report,
+  as [`relay notifier check`](notifier.md) prints it: the environment
+  (desktop or headless, and why) and the adapters; ok when the alerts reach
+  you. Skipped when the plugin or python3 is missing.
 
-The optional checks (`os`, `git`, `notify-send`) never fail the doctor; they
+The optional checks (`os`, `git`, `notify-send`, `notifications`) never fail the doctor; they
 show as `!`. A `claude` in `~/.local/bin` while that directory is off PATH
 fails the `claude` check with no fix but the advice to add it to the shell's
 profile: tmux runs `claude` through PATH, and reinstalling would not help.

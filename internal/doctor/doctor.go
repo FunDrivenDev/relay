@@ -17,6 +17,7 @@ import (
 
 	"github.com/FunDrivenDev/relay/internal/cli"
 	"github.com/FunDrivenDev/relay/internal/fail"
+	"github.com/FunDrivenDev/relay/internal/notifier"
 	"github.com/FunDrivenDev/relay/internal/run"
 	"github.com/FunDrivenDev/relay/internal/session"
 	"github.com/FunDrivenDev/relay/internal/ui"
@@ -127,7 +128,9 @@ func checklist(t ui.Theme, checks []Check) string {
 		name := c.Name + strings.Repeat(" ", width-len(c.Name))
 		fmt.Fprintf(&b, "%s %s  %s\n", mark, t.Title.Render(name), c.Message)
 		if !c.OK && c.Fix != nil {
-			fmt.Fprintf(&b, "  %s  %s\n", strings.Repeat(" ", width), t.Command.Render(*c.Fix))
+			for line := range strings.Lines(*c.Fix) {
+				fmt.Fprintf(&b, "  %s  %s\n", strings.Repeat(" ", width), t.Command.Render(strings.TrimRight(line, "\n")))
+			}
 		}
 	}
 	return b.String()
@@ -146,8 +149,10 @@ var check = cli.New(cli.Spec{
   python3          on PATH, 3.9 or later (the plugin's handover.py)
   ps               procps' ps, which handover.py walks (ps -o ppid= -p)
   git              optional: handover.py reads the repo for context
-  notify-send      optional: desktop notifications of AFK runs (libnotify-bin)
+  notify-send      optional: desktop alerts of AFK runs on a Linux desktop
+                   (libnotify-bin); elsewhere notify_command is the way
   handover-plugin  handover@fundrivendev installed in Claude Code
+  notifications    optional: the plugin's alerts reach you (relay notifier check)
 
 Each unmet check comes with the command that fixes it, for Ubuntu; relay
 doctor fix runs them. Exit 1 when a required check fails (code
@@ -184,6 +189,9 @@ func inspect(ctx context.Context, env *cli.Env) Report {
 		goos = runtime.GOOS
 	}
 	osCheck, distro := checkOS(env, goos)
+	// The plugin's view of the notifications, which the notify-send check
+	// follows: relay does not detect the desktop itself.
+	alerts, _, alertsErr := notifier.Inspect(ctx, env, false)
 	checks := []Check{
 		osCheck,
 		checkTmux(ctx),
@@ -191,8 +199,9 @@ func inspect(ctx context.Context, env *cli.Env) Report {
 		checkPython(ctx),
 		checkPS(ctx),
 		checkGit(ctx),
-		checkNotify(ctx),
+		checkNotify(ctx, alerts, alertsErr),
 		checkPlugin(env),
+		checkNotifications(alerts, alertsErr),
 	}
 	r := Report{OK: true, OS: goos, Distro: distro, Checks: checks}
 	root := asRoot(env)
@@ -471,17 +480,47 @@ func checkGit(ctx context.Context) Check {
 	return c
 }
 
-func checkNotify(ctx context.Context) Check {
+// checkNotify checks notify-send, which only a Linux desktop uses: where the
+// plugin finds none (headless, SSH, WSL, macOS), alerts need notify_command.
+func checkNotify(ctx context.Context, alerts notifier.Report, alertsErr error) Check {
 	c := Check{Name: "notify-send", pkg: "libnotify-bin", step: stepApt}
 	out, found, _ := tool(ctx, "notify-send", "--version")
 	if !found {
-		c.Message = "not found (optional: AFK alerts fall back to the terminal bell)"
+		if e := alerts.Environment; alertsErr == nil && (e.OS != "linux" || !e.Desktop) {
+			c.OK = true
+			c.Message = "not used here (" + e.Why + "): set notify_command (Slack, ntfy…) to be reached, see notifications"
+			return c
+		}
+		c.Message = "not found (optional: desktop alerts of AFK runs; without it, the terminal bell)"
 		c.install = true
 		return c
 	}
 	c.OK = true
 	c.Version = toolVersion(out)
 	c.Message = strings.TrimSpace("notify-send " + c.Version)
+	return c
+}
+
+// checkNotifications reports, from the plugin, whether its alerts reach you
+// here: optional, skipped without the plugin or python3.
+func checkNotifications(alerts notifier.Report, err error) Check {
+	c := Check{Name: "notifications"}
+	switch {
+	case fail.CodeOf(err) == fail.RelayMissing:
+		c.Message = "skipped: the handover plugin is not installed"
+		return c
+	case fail.CodeOf(err) == fail.ToolMissing:
+		c.Message = "skipped: python3 is missing"
+		return c
+	case err != nil:
+		c.Message = "skipped: " + err.Error()
+		return c
+	}
+	c.OK = alerts.ReachesYou
+	c.Message = alerts.Environment.Where() + ": " + strings.Join(alerts.Adapters, ", ")
+	if !c.OK || len(alerts.Hints) > 0 {
+		c.Fix = fixWith(strings.Join(alerts.Advice(), "\n"))
+	}
 	return c
 }
 

@@ -5,7 +5,8 @@
 env RELAY_GOOS=linux
 env RELAY_OS_RELEASE=$WORK/os-release
 env RELAY_EUID=1000
-stub tmux claude python3 ps git notify-send
+stub tmux claude ps git notify-send
+exec sh -c 'cp fake-python3 bin/python3 && chmod +x bin/python3'
 exec sh -c 'mkdir -p "$HOME/.claude/plugins" "$WORK/plugin/scripts" && touch "$WORK/plugin/scripts/handover.py" && sed "s|@WORK@|$WORK|" installed.json >"$HOME/.claude/plugins/installed_plugins.json" && cp known.json "$HOME/.claude/plugins/known_marketplaces.json"'
 
 # All met: the checklist, exit 0; the flag form and the JSON form agree.
@@ -37,9 +38,22 @@ exec relay doctor check --json
 stdout '"ok": true'
 stdout '"command": "sudo apt-get install -y git libnotify-bin"'
 exec relay doctor check
-stdout '^! notify-send +not found \(optional: AFK alerts fall back to the terminal bell\)$'
+stdout '^! notify-send +not found \(optional: desktop alerts of AFK runs; without it, the terminal bell\)$'
 stdout '^ +sudo apt-get install -y libnotify-bin$'
 stdout 'relay doctor fix'
+
+# Headless (SSH), as the plugin reports it: notify-send is of no use, the
+# notifications check points to notify_command and the guide; neither fails.
+cp headless.json notifier.json
+exec relay doctor check
+stdout '^✓ notify-send +not used here \(over SSH, without a display\): set notify_command \(Slack, ntfy…\) to be reached, see notifications$'
+stdout '^! notifications +linux, headless, over SSH \(over SSH, without a display\): bell$'
+stdout '^ +over SSH, without a display: only the bell rings; set notify_command \(Slack, ntfy…\) to be reached$'
+stdout '^ +options: .*; guide: https://github.com/FunDrivenDev/claude-plugins/blob/main/plugins/handover/docs/notifications.md$'
+exec relay doctor check --json
+stdout '"command": "sudo apt-get install -y git"'
+! stdout libnotify-bin
+cp notifier.txt notifier.json
 stub git notify-send
 
 # tmux missing: a required check fails, exit 1 (requirements_missing); the
@@ -83,6 +97,7 @@ rm home/.claude/plugins/installed_plugins.json
 exits 1 relay doctor check
 stdout '^✗ handover-plugin +handover@fundrivendev is not installed in Claude Code$'
 stdout '^ +claude plugin install handover@fundrivendev$'
+stdout '^! notifications +skipped: the handover plugin is not installed$'
 # The marketplace unknown too: added first.
 rm home/.claude/plugins/known_marketplaces.json
 exits 1 relay doctor check --json
@@ -95,6 +110,23 @@ stderr 'unknown option: --dry-run'
 exec relay doctor check --help --json
 stdout '"output": "\{\\"ok\\", \\"os\\", \\"distro\\"'
 
+-- fake-python3 --
+#!/bin/sh
+# A fake python3: --version from stubs/python3.stdout, handover.py notifier
+# from notifier.json; every call logged as a stub's.
+printf 'python3' >>"$WORK/stubs.log"
+for a in "$@"; do printf ' %s' "${a##*/}" >>"$WORK/stubs.log"; done
+echo >>"$WORK/stubs.log"
+case $1 in
+--version) cat "$WORK/stubs/python3.stdout" ;;
+*) [ "$2" = notifier ] && cat "$WORK/notifier.json" ;;
+esac
+-- headless.json --
+{"environment": {"os": "linux", "desktop": false, "ssh": true, "why": "over SSH, without a display", "tools": {"osascript": false, "notify-send": false}}, "notifier": "auto", "notify_command_set": false, "adapters": ["bell"], "reaches_you": false, "hints": ["over SSH, without a display: only the bell rings; set notify_command (Slack, ntfy…) to be reached", "options: /handover:config, or: claude plugin configure handover@fundrivendev; guide: https://github.com/FunDrivenDev/claude-plugins/blob/main/plugins/handover/docs/notifications.md"]}
+-- notifier.txt --
+{"environment": {"os": "linux", "desktop": true, "ssh": false, "why": "a Linux desktop session", "tools": {"osascript": false, "notify-send": true}}, "notifier": "auto", "notify_command_set": false, "adapters": ["notify-send", "bell"], "reaches_you": true, "hints": []}
+-- notifier.json --
+{"environment": {"os": "linux", "desktop": true, "ssh": false, "why": "a Linux desktop session", "tools": {"osascript": false, "notify-send": true}}, "notifier": "auto", "notify_command_set": false, "adapters": ["notify-send", "bell"], "reaches_you": true, "hints": []}
 -- os-release --
 NAME="Ubuntu"
 VERSION="24.04.1 LTS (Noble Numbat)"
@@ -134,6 +166,7 @@ notify-send 0.8.3
 ✓ git              git 2.43.0
 ✓ notify-send      notify-send 0.8.3
 ✓ handover-plugin  handover@fundrivendev 0.15.0
+✓ notifications    linux, desktop (a Linux desktop session): notify-send, bell
 
 relay is ready.
 -- ok.json --
@@ -204,6 +237,14 @@ relay is ready.
       "required": true,
       "version": "0.15.0",
       "message": "handover@fundrivendev 0.15.0",
+      "fix": null
+    },
+    {
+      "name": "notifications",
+      "ok": true,
+      "required": false,
+      "version": "",
+      "message": "linux, desktop (a Linux desktop session): notify-send, bell",
       "fix": null
     }
   ],

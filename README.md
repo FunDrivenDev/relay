@@ -32,7 +32,7 @@ latest, `RELAY_INSTALL_DIR=<dir>` another directory than `~/.local/bin`.
 
 ```sh
 relay doctor check   # read-only: Linux, tmux >= 3.2, claude, python3 >= 3.9,
-                     # ps, git, notify-send, the handover plugin
+                     # ps, git, notify-send, the handover plugin, notifications
 relay doctor fix     # installs what is missing, after asking
 ```
 
@@ -42,11 +42,9 @@ Claude Code's installer (`curl -fsSL https://claude.ai/install.sh | bash`), then
 `claude plugin install handover@fundrivendev`. `--dry-run` shows the plan,
 `--yes` skips the question.
 
-`git` and `notify-send` are optional. With `notify-send` (package
-`libnotify-bin`), the plugin sends AFK alerts as desktop notifications; without
-it, or over SSH, they fall back to the terminal bell. Ubuntu 20.04's tmux 3.0
-and Python 3.8 are too old: use 22.04 or later. See
-[docs/doctor.md](docs/doctor.md).
+`git`, `notify-send` and `notifications` are optional (see
+[Notifications](#notifications)). Ubuntu 20.04's tmux 3.0 and Python 3.8 are
+too old: use 22.04 or later. See [docs/doctor.md](docs/doctor.md).
 
 ## Use
 
@@ -73,6 +71,34 @@ come back with `relay session attach`.
 
 The handover plugin's settings (where handovers are written, the notifier)
 are in its own docs.
+
+## Notifications
+
+The plugin calls you back when an AFK run ends, waits or stops: a desktop
+notification on macOS and on a Linux desktop (`notify-send`, package
+`libnotify-bin`), and the terminal bell always. Headless, over SSH or under
+WSL, only the bell rings: set the plugin's `notify_command` to reach you
+elsewhere (Slack, ntfy).
+
+```sh
+relay notifier check   # the environment detected, the adapters, the hints
+relay notifier test    # sends a test alert through them
+```
+
+For Slack, keep `notifier` on `auto` and point `notify_command` at a script
+that posts to a webhook (in `/handover:config`, or Claude Code's
+`settings.json`):
+
+```json
+{"pluginConfigs": {"handover@fundrivendev": {"options": {
+  "notifier": "auto",
+  "notify_command": "$HOME/.local/bin/handover-notify-slack"
+}}}}
+```
+
+The script, the webhook setup and ntfy are in the plugin's
+[notifications guide](https://github.com/FunDrivenDev/claude-plugins/blob/main/plugins/handover/docs/notifications.md);
+relay's side is in [docs/notifier.md](docs/notifier.md).
 
 Every command takes `--help`, `--json` input and output, and `--dry-run` when
 it changes something: see [the docs](docs/README.md).

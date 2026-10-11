@@ -4,7 +4,8 @@
 env RELAY_GOOS=linux
 env RELAY_OS_RELEASE=$WORK/os-release
 env RELAY_EUID=1000
-stub tmux python3 ps git notify-send curl
+stub tmux ps git notify-send curl
+exec sh -c 'cp fake-python3 bin/python3 && chmod +x bin/python3'
 exec sh -c 'mkdir -p bin "$HOME/.local/bin" && cp fake-sudo bin/sudo && chmod +x bin/sudo && cp fake-claude bin/claude && chmod +x bin/claude && bin/claude plugin install handover@fundrivendev && rm stubs.log'
 
 # Nothing to fix: nothing runs.
@@ -82,6 +83,19 @@ exec relay doctor fix --help --json
 stdout '"yes": "runs the fixes without asking"'
 stdout '"state_changing": true'
 
+-- fake-python3 --
+#!/bin/sh
+# A fake python3: --version from stubs/python3.stdout, handover.py notifier
+# from notifier.json; every call logged as a stub's.
+printf 'python3' >>"$WORK/stubs.log"
+for a in "$@"; do printf ' %s' "${a##*/}" >>"$WORK/stubs.log"; done
+echo >>"$WORK/stubs.log"
+case $1 in
+--version) cat "$WORK/stubs/python3.stdout" ;;
+*) [ "$2" = notifier ] && cat "$WORK/notifier.json" ;;
+esac
+-- notifier.json --
+{"environment": {"os": "linux", "desktop": true, "ssh": false, "why": "a Linux desktop session", "tools": {"osascript": false, "notify-send": true}}, "notifier": "auto", "notify_command_set": false, "adapters": ["notify-send", "bell"], "reaches_you": true, "hints": []}
 -- os-release --
 PRETTY_NAME="Ubuntu 24.04.1 LTS"
 -- stubs/python3.stdout --
@@ -215,6 +229,14 @@ esac
       "version": "",
       "message": "handover@fundrivendev is not installed in Claude Code",
       "fix": "claude plugin marketplace add FunDrivenDev/claude-plugins && claude plugin install handover@fundrivendev"
+    },
+    {
+      "name": "notifications",
+      "ok": false,
+      "required": false,
+      "version": "",
+      "message": "skipped: the handover plugin is not installed",
+      "fix": null
     }
   ]
 }
@@ -240,6 +262,7 @@ sudo apt-get install -y tmux
 curl -fsSL https://claude.ai/install.sh
 claude plugin marketplace add FunDrivenDev/claude-plugins
 claude plugin install handover@fundrivendev
+python3 handover.py notifier
 claude --version
 python3 --version
 ps -o ppid= -p 1
