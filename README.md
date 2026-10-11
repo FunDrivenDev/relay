@@ -19,14 +19,21 @@ brew install fundrivendev/tap/relay
 # The install script: no sudo, into ~/.local/bin; run it again to update.
 curl -fsSL https://raw.githubusercontent.com/FunDrivenDev/relay/main/install.sh | sh
 
-# The .deb of a release (it pulls tmux, python3 and procps)
+# The .deb of a release (it pulls tmux, python3 and procps); relay_0.1.0_arm64.deb on arm64
 curl -fsSLO https://github.com/FunDrivenDev/relay/releases/download/v0.1.0/relay_0.1.0_amd64.deb
 sudo apt install ./relay_0.1.0_amd64.deb
 ```
 
+Each release also has `.rpm` packages (`relay-0.1.0-1.x86_64.rpm`,
+`relay-0.1.0-1.aarch64.rpm`) and the archives the install script takes
+(`relay_linux_amd64.tar.gz`, `relay_linux_arm64.tar.gz`).
+
 The install script checks the download's sha256 against the release's
 `checksums.txt`. `RELAY_VERSION=0.1.0` installs another release than the
-latest, `RELAY_INSTALL_DIR=<dir>` another directory than `~/.local/bin`.
+latest, `RELAY_INSTALL_DIR=<dir>` another directory than `~/.local/bin`, and
+`RELAY_BASE_URL=<url>` downloads the archive and `checksums.txt` from
+`<url>` instead of GitHub (a mirror, or a `just release` build's `dist/`
+served over HTTP).
 
 ## Check the machine
 

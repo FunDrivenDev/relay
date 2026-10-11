@@ -6,7 +6,9 @@
 # It downloads the latest release (RELAY_VERSION=1.2.3 for another) for
 # Linux amd64 or arm64, checks its sha256 against the release's
 # checksums.txt, installs relay into RELAY_INSTALL_DIR ($HOME/.local/bin by
-# default), then runs relay doctor check.
+# default), then runs relay doctor check. RELAY_BASE_URL=<url> downloads the
+# archive and checksums.txt from another place (a mirror, a local build's
+# dist/ served over HTTP) instead of the GitHub release.
 set -eu
 
 repo=FunDrivenDev/relay
@@ -28,7 +30,10 @@ case $machine in
 esac
 command -v curl >/dev/null 2>&1 || die "curl is needed: sudo apt-get install -y curl"
 
-if [ -n "${RELAY_VERSION:-}" ]; then
+if [ -n "${RELAY_BASE_URL:-}" ]; then
+    base=${RELAY_BASE_URL%/}
+    version="from $base"
+elif [ -n "${RELAY_VERSION:-}" ]; then
     version=${RELAY_VERSION#v}
     base="https://github.com/$repo/releases/download/v$version"
 else
