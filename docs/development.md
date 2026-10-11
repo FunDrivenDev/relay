@@ -153,3 +153,19 @@ tmux list-sessions -F #{session_name}	#{session_windows}	#{session_attached}	#{p
 - `just test [scope]`: `go test -race ./...` (without `-race` on staged files).
 - `just audit`: gitleaks over the history (secrets, home-directory paths),
   govulncheck.
+
+## Release
+
+Linux only: amd64 and arm64 archives (`relay_linux_<arch>.tar.gz`, without
+the version, so the latest release keeps one URL for `install.sh`),
+`checksums.txt`, and `.deb` and `.rpm` packages (`.goreleaser.yaml`).
+
+1. `just release` (snapshot) builds all of it into `dist/` without publishing.
+2. On main, clean and green: `git tag vX.Y.Z && git push origin vX.Y.Z`.
+3. `GITHUB_TOKEN=… just release publish` publishes the GitHub release of the
+   tag.
+4. `scripts/formula.sh X.Y.Z ><homebrew-tap>/Formula/relay.rb` writes the
+   formula from `dist/checksums.txt`; open a PR on FunDrivenDev/homebrew-tap
+   with it.
+
+`install.sh` needs nothing more: it downloads the latest release.
