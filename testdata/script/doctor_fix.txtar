@@ -23,10 +23,12 @@ rm bin/tmux bin/claude
 
 # --dry-run: the plan, nothing run; the flag form and the JSON form agree.
 exec relay doctor fix --dry-run
+stderr '^would run sudo apt-get update$'
 stderr '^would run sudo apt-get install -y tmux$'
 stderr '^would run curl -fsSL https://claude.ai/install.sh \| bash$'
 stderr '^would run claude plugin marketplace add FunDrivenDev/claude-plugins$'
 stderr '^would run claude plugin install handover@fundrivendev$'
+stdout '^· sudo apt-get update$'
 stdout '^· sudo apt-get install -y tmux$'
 exec relay doctor fix --dry-run --json
 cp stdout flags.json
@@ -48,7 +50,8 @@ rm stubs.log
 cp exit1.txt sudo.exit
 exits 1 relay doctor fix --yes --json
 stderr '"code":"fix_failed"'
-stdout '"name": "packages",\n +"command": "sudo apt-get install -y tmux",\n +"ran": true,\n +"ok": false'
+stdout '"name": "apt-update",\n +"command": "sudo apt-get update",\n +"ran": true,\n +"ok": false'
+stdout '"name": "packages",\n +"command": "sudo apt-get install -y tmux",\n +"ran": false'
 stdout '"name": "claude",\n +"command": "curl -fsSL https://claude.ai/install.sh \| bash",\n +"ran": false'
 cmp stubs.log failed.log
 rm sudo.exit stubs.log
@@ -57,6 +60,7 @@ rm sudo.exit stubs.log
 # checks after them see the shell's PATH, where ~/.local/bin is missing: not
 # ready until it is added.
 exits 1 relay doctor fix --yes
+stderr '^running sudo apt-get update$'
 stderr '^running sudo apt-get install -y tmux$'
 stderr '^running curl -fsSL https://claude.ai/install.sh \| bash$'
 stderr 'is not on your PATH: add it to your shell''s profile'
@@ -139,6 +143,13 @@ esac
   "ok": false,
   "dry_run": true,
   "steps": [
+    {
+      "name": "apt-update",
+      "command": "sudo apt-get update",
+      "ran": false,
+      "ok": false,
+      "error": ""
+    },
     {
       "name": "packages",
       "command": "sudo apt-get install -y tmux",
@@ -249,7 +260,7 @@ ps -o ppid= -p 1
 ps --version
 git --version
 notify-send --version
-sudo apt-get install -y tmux
+sudo apt-get update
 python3 --version
 ps -o ppid= -p 1
 ps --version
@@ -261,6 +272,7 @@ ps -o ppid= -p 1
 ps --version
 git --version
 notify-send --version
+sudo apt-get update
 sudo apt-get install -y tmux
 curl -fsSL https://claude.ai/install.sh
 claude plugin marketplace add FunDrivenDev/claude-plugins

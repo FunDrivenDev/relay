@@ -85,6 +85,7 @@ func TestPlan(t *testing.T) {
 	}
 	got := plan(env, checks)
 	want := []Step{
+		{"apt-update", "apt-get update"},
 		{"packages", "apt-get install -y tmux git curl"},
 		{"claude", claudeInstall},
 		{"marketplace", marketplaceAdd},
@@ -97,6 +98,22 @@ func TestPlan(t *testing.T) {
 		if got[i] != want[i] {
 			t.Errorf("step %d = %v, want %v", i, got[i], want[i])
 		}
+	}
+	// No package to install: no apt-get update either.
+	for _, s := range plan(env, checks[1:2]) {
+		if s.Name == "apt-update" || s.Name == "packages" {
+			t.Errorf("plugin only: plan has %v", s)
+		}
+	}
+}
+
+func TestAptUpdate(t *testing.T) {
+	t.Parallel()
+	if got := aptUpdate(false); got != "sudo apt-get update" {
+		t.Errorf("as a user: %q", got)
+	}
+	if got := aptUpdate(true); got != "apt-get update" {
+		t.Errorf("as root: %q", got)
 	}
 }
 

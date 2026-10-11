@@ -244,7 +244,10 @@ func plan(env *cli.Env, checks []Check) []Step {
 	}
 	steps := []Step{}
 	if len(pkgs) > 0 {
-		steps = append(steps, Step{Name: "packages", Command: aptInstall(root, pkgs...)})
+		// A fresh image or a long-idle machine has no or stale package lists.
+		steps = append(steps,
+			Step{Name: "apt-update", Command: aptUpdate(root)},
+			Step{Name: "packages", Command: aptInstall(root, pkgs...)})
 	}
 	if claude {
 		steps = append(steps, Step{Name: "claude", Command: claudeInstall})
@@ -275,6 +278,15 @@ func aptInstall(root bool, pkgs ...string) string {
 		line = "sudo " + line
 	}
 	return line
+}
+
+// aptUpdate is the apt-get line that refreshes the package lists, through
+// sudo unless relay runs as root.
+func aptUpdate(root bool) string {
+	if root {
+		return "apt-get update"
+	}
+	return "sudo apt-get update"
 }
 
 func fixWith(command string) *string { return &command }

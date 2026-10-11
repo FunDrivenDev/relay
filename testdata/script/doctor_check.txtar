@@ -66,7 +66,7 @@ stdout '^ +sudo apt-get install -y tmux$'
 env RELAY_EUID=0
 exits 1 relay doctor check --json
 stdout '"ok": false'
-stdout '"fixes": \[\n +\{\n +"name": "packages",\n +"command": "apt-get install -y tmux"'
+stdout '"fixes": \[\n +\{\n +"name": "apt-update",\n +"command": "apt-get update"\n +\},\n +\{\n +"name": "packages",\n +"command": "apt-get install -y tmux"'
 cmp stderr missing.json
 env RELAY_EUID=1000
 stub tmux

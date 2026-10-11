@@ -43,7 +43,8 @@ relay doctor check   # read-only: Linux, tmux >= 3.2, claude, python3 >= 3.9,
 relay doctor fix     # installs what is missing, after asking
 ```
 
-`doctor fix` runs one `sudo apt-get install -y` line for the missing packages,
+`doctor fix` runs `sudo apt-get update` and one `sudo apt-get install -y` line
+for the missing packages,
 Claude Code's installer (`curl -fsSL https://claude.ai/install.sh | bash`), then
 `claude plugin marketplace add FunDrivenDev/claude-plugins` and
 `claude plugin install handover@fundrivendev`. `--dry-run` shows the plan,

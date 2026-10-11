@@ -81,6 +81,7 @@ is still printed on stdout, and the error envelope goes to stderr.
      "message": "not found on PATH", "fix": "sudo apt-get install -y tmux"}
   ],
   "fixes": [
+    {"name": "apt-update", "command": "sudo apt-get update"},
     {"name": "packages", "command": "sudo apt-get install -y tmux"}
   ]
 }
@@ -89,14 +90,17 @@ is still printed on stdout, and the error envelope goes to stderr.
 `fix` is `null` when there is none. `fixes` is the plan `doctor fix` runs,
 in order:
 
-1. `packages`: one `apt-get install -y` line with every missing package
+1. `apt-update`: `apt-get update`, so a fresh image or a long-idle machine
+   has current package lists; only when packages are to be installed
+   (`sudo` omitted when relay runs as root, as below);
+2. `packages`: one `apt-get install -y` line with every missing package
    (`sudo` omitted when relay runs as root), plus `curl` when Claude Code is
    missing and curl is too;
-2. `claude`: Claude Code's installer;
-3. `marketplace`: `claude plugin marketplace add FunDrivenDev/claude-plugins`,
+3. `claude`: Claude Code's installer;
+4. `marketplace`: `claude plugin marketplace add FunDrivenDev/claude-plugins`,
    only when Claude Code does not know the `fundrivendev` marketplace
    (`plugins/known_marketplaces.json`);
-4. `handover-plugin`: `claude plugin install handover@fundrivendev`.
+5. `handover-plugin`: `claude plugin install handover@fundrivendev`.
 
 ## doctor fix
 
@@ -123,6 +127,8 @@ while `~/.local/bin` is off the shell's PATH.
   "ok": true,
   "dry_run": false,
   "steps": [
+    {"name": "apt-update", "command": "sudo apt-get update",
+     "ran": true, "ok": true, "error": ""},
     {"name": "packages", "command": "sudo apt-get install -y tmux",
      "ran": true, "ok": true, "error": ""}
   ],
