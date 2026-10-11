@@ -54,13 +54,13 @@ AFK run. The flag form and the JSON form give the same ones.
 Output:
 
 ```json
-{"session": {"name": "s1", "path": "/Users/me/proj", "afk": false, "where": "detached", "attached": false}}
+{"session": {"name": "s1", "path": "/home/me/proj", "afk": false, "where": "detached", "attached": false}}
 ```
 
 With `--dry-run`, nothing runs, and the handover plugin need not be installed:
 
 ```json
-{"dry_run": true, "session": {"name": "s1", "path": "/Users/me/proj", "afk": true, "where": "detached"},
+{"dry_run": true, "session": {"name": "s1", "path": "/home/me/proj", "afk": true, "where": "detached"},
  "relay_args": ["--afk", "goal", "--until", "8", "--yolo"]}
 ```
 
@@ -93,7 +93,7 @@ terminal or `NO_COLOR` is set, one plain line each (`s1  1 window(s)
 (`no sessions` on stderr). `--json` is the same in every case.
 
 ```json
-{"sessions": [{"name": "s1", "windows": 1, "attached": false, "path": "/Users/me/proj"}]}
+{"sessions": [{"name": "s1", "windows": 1, "attached": false, "path": "/home/me/proj"}]}
 ```
 
 ## session attach
