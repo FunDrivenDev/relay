@@ -5,9 +5,13 @@ package ui
 
 import (
 	"io"
+	"os"
+	"slices"
+	"strings"
 
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/colorprofile"
+	"golang.org/x/term"
 )
 
 // Catppuccin Frappé, the colours relay uses.
@@ -33,6 +37,9 @@ type Theme struct {
 	OK      lipgloss.Style
 	Warn    lipgloss.Style
 	Error   lipgloss.Style
+	// Rich is set when the output goes to a terminal that takes colours:
+	// a result may then draw a table or a box rather than plain lines.
+	Rich bool
 }
 
 // Frappe is the relay theme.
@@ -51,4 +58,24 @@ var Frappe = Theme{
 // plain text when w is not a terminal, or when NO_COLOR is set in environ.
 func Writer(w io.Writer, environ []string) io.Writer {
 	return colorprofile.NewWriter(w, environ)
+}
+
+// IsRich reports whether w is a terminal that takes styles: not when NO_COLOR
+// is set (not empty) or TERM is dumb in environ.
+func IsRich(w io.Writer, environ []string) bool {
+	f, ok := w.(*os.File)
+	if !ok || !term.IsTerminal(int(f.Fd())) {
+		return false
+	}
+	return !slices.ContainsFunc(environ, func(kv string) bool {
+		k, v, _ := strings.Cut(kv, "=")
+		return (k == "NO_COLOR" && v != "") || (k == "TERM" && v == "dumb")
+	})
+}
+
+// For is the theme for output written to w: Frappe, Rich when w takes it.
+func For(w io.Writer, environ []string) Theme {
+	t := Frappe
+	t.Rich = IsRich(w, environ)
+	return t
 }

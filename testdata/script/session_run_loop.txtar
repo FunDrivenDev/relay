@@ -1,0 +1,121 @@
+# relay session run without tmux: the restart loop. The relay leaves the
+# resume message in $HANDOVER_RELAY_FILE and ends claude; the loop starts claude
+# again with the same arguments plus that message, until a session ends
+# without one. claude finds the loop as its parent (HANDOVER_RELAY_PID).
+# tmux is not on the scripts' PATH (docs/development.md).
+
+exec sh setup.sh
+env CLAUDE_CONFIG_DIR=$WORK/claude
+
+# Two relays, then a session that ends on its own.
+cp message.txt relay.1
+cp message.txt relay.2
+exec relay session run --model opus hi
+cmp claude.log want/plain.claude
+exec sh -c 'test ! -e "$(cat relay-file)"'
+
+# An AFK run: the goal is the first prompt only, the resume message replaces it.
+exec sh reset.sh
+cp message.txt relay.1
+exec relay session run --afk 'the goal' --until @1760248800 --yolo --model opus
+cmp claude.log want/afk.claude
+cmp stubs.log want/afk.log
+
+-- setup.sh --
+set -e
+for f in claude python3; do cp "fake/$f" "bin/$f" && chmod +x "bin/$f"; done
+mkdir -p claude/plugins handover/scripts
+: >handover/scripts/handover.py
+printf '{"plugins": {"handover@fundrivendev": [{"installPath": "%s/handover"}]}}\n' "$WORK" >claude/plugins/installed_plugins.json
+-- reset.sh --
+rm -f stubs.log claude.log .claude.calls relay.*
+-- message.txt --
+Continue the work from the handover loaded above.
+
+-- fake/claude --
+#!/usr/bin/env bash
+# A fake claude: logs its arguments, its directory and the relay's environment
+# to $WORK/claude.log; on its n-th call, leaves $WORK/relay.<n> (a resume
+# message) in $HANDOVER_RELAY_FILE, as the plugin's relay does.
+n=$(($(cat "$WORK/.claude.calls" 2>/dev/null || echo 0) + 1))
+echo "$n" >"$WORK/.claude.calls"
+{
+	echo "call $n in ${PWD##*/}"
+	for a in "$@"; do echo "  arg $a"; done
+	env | grep -E '^(HANDOVER_[A-Z_]*|TMUX|TMUX_PANE)=' | sort | while IFS= read -r kv; do
+		case $kv in
+			TMUX=?*) kv="TMUX=<set>" ;;
+			HANDOVER_RELAY_FILE=?*) [[ -f ${kv#*=} ]] && kv="HANDOVER_RELAY_FILE=<a file>" ;;
+			HANDOVER_RELAY_PID=$PPID) kv="HANDOVER_RELAY_PID=<claude's parent>" ;;
+		esac
+		echo "  env $kv"
+	done
+} >>"$WORK/claude.log"
+[[ -z ${HANDOVER_RELAY_FILE:-} ]] || echo "$HANDOVER_RELAY_FILE" >"$WORK/relay-file"
+if [[ -f $WORK/relay.$n ]]; then cp "$WORK/relay.$n" "$HANDOVER_RELAY_FILE"; fi
+exit 0
+-- fake/python3 --
+#!/usr/bin/env bash
+{
+	printf 'python3 %s' "${1##*/}"
+	shift
+	printf ' %s' "$@"
+	echo
+} >>"$WORK/stubs.log"
+case $1 in
+	yolo-settings) echo '{"permissions": {"deny": ["Edit(//plugin)"]}}' ;;
+	*) exit 2 ;;
+esac
+-- want/plain.claude --
+call 1 in script-session_run_loop
+  arg --model
+  arg opus
+  arg hi
+  env HANDOVER_RELAY=1
+  env HANDOVER_RELAY_FILE=<a file>
+  env HANDOVER_RELAY_PID=<claude's parent>
+call 2 in script-session_run_loop
+  arg --model
+  arg opus
+  arg hi
+  arg Continue the work from the handover loaded above.
+  env HANDOVER_RELAY=1
+  env HANDOVER_RELAY_FILE=<a file>
+  env HANDOVER_RELAY_PID=<claude's parent>
+call 3 in script-session_run_loop
+  arg --model
+  arg opus
+  arg hi
+  arg Continue the work from the handover loaded above.
+  env HANDOVER_RELAY=1
+  env HANDOVER_RELAY_FILE=<a file>
+  env HANDOVER_RELAY_PID=<claude's parent>
+-- want/afk.claude --
+call 1 in script-session_run_loop
+  arg --dangerously-skip-permissions
+  arg --settings
+  arg {"permissions": {"deny": ["Edit(//plugin)"]}}
+  arg --model
+  arg opus
+  arg the goal
+  env HANDOVER_AFK_GOAL=the goal
+  env HANDOVER_AFK_UNTIL=1760248800
+  env HANDOVER_AFK_YOLO=1
+  env HANDOVER_RELAY=1
+  env HANDOVER_RELAY_FILE=<a file>
+  env HANDOVER_RELAY_PID=<claude's parent>
+call 2 in script-session_run_loop
+  arg --dangerously-skip-permissions
+  arg --settings
+  arg {"permissions": {"deny": ["Edit(//plugin)"]}}
+  arg --model
+  arg opus
+  arg Continue the work from the handover loaded above.
+  env HANDOVER_AFK_GOAL=the goal
+  env HANDOVER_AFK_UNTIL=1760248800
+  env HANDOVER_AFK_YOLO=1
+  env HANDOVER_RELAY=1
+  env HANDOVER_RELAY_FILE=<a file>
+  env HANDOVER_RELAY_PID=<claude's parent>
+-- want/afk.log --
+python3 handover.py yolo-settings

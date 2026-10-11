@@ -55,8 +55,9 @@ command's declaration: no command parses its own arguments.
   under `--json`.
 - `--json` (or `--json=<input>`) makes the output JSON, indented, one document.
   Each command's help describes its shape (the `output` key of its spec).
-- Without `--json`, the human form: styled in Catppuccin Frappé on a terminal,
-  plain when stdout is not a terminal or `NO_COLOR` is set.
+- Without `--json`, the human form: styled in Catppuccin Frappé on a terminal
+  (tables drawn with lipgloss), plain lines when stdout is not a terminal or
+  `NO_COLOR` is set.
 
 ## Behaviour
 

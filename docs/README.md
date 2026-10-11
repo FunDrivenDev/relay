@@ -7,3 +7,5 @@
 ## Entities
 
 One page per entity, one line each here.
+
+- [session](session.md): Claude Code sessions under tmux and the handover relay, `session create|list|attach|run`; its contract with the handover plugin: [handover-relay.md](handover-relay.md)

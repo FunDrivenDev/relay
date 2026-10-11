@@ -1,0 +1,68 @@
+# relay session list: the tmux sessions.
+
+stub tmux
+
+# No tmux server: no sessions, said on stderr; an empty list under --json.
+exec relay session list
+! stdout .
+stderr '^no sessions$'
+exec relay session list --json
+cmp stdout empty.json
+! stderr .
+
+# The rows, in both forms; the flag form and the JSON form agree.
+exec relay session list
+cmp stdout want.txt
+exec relay session list --json
+cp stdout flags.json
+exec relay session list --json='{}'
+cmp stdout flags.json
+cmp flags.json want.json
+cmp stubs.log want.log
+
+exits 2 relay session list --dry-run
+stderr 'unknown option: --dry-run'
+exits 2 relay session list extra
+stderr '"?extra'
+exec relay session list --help --json
+stdout '"output": "\{\\"sessions\\": \[\{\\"name\\", \\"windows\\", \\"attached\\", \\"path\\"\}\]\}"'
+
+-- stubs/tmux.1.exit --
+1
+-- stubs/tmux.1.stderr --
+no server running on /tmp/tmux-501/default
+-- stubs/tmux.2.exit --
+1
+-- stubs/tmux.stdout --
+s1	1	0	/home/me/proj
+afk-proj	2	1	/home/me/afk proj
+-- empty.json --
+{
+  "sessions": []
+}
+-- want.txt --
+s1  1 window(s)  /home/me/proj
+afk-proj  2 window(s)  (attached)  /home/me/afk proj
+-- want.json --
+{
+  "sessions": [
+    {
+      "name": "s1",
+      "windows": 1,
+      "attached": false,
+      "path": "/home/me/proj"
+    },
+    {
+      "name": "afk-proj",
+      "windows": 2,
+      "attached": true,
+      "path": "/home/me/afk proj"
+    }
+  ]
+}
+-- want.log --
+tmux list-sessions -F #{session_name}	#{session_windows}	#{session_attached}	#{pane_current_path}
+tmux list-sessions -F #{session_name}	#{session_windows}	#{session_attached}	#{pane_current_path}
+tmux list-sessions -F #{session_name}	#{session_windows}	#{session_attached}	#{pane_current_path}
+tmux list-sessions -F #{session_name}	#{session_windows}	#{session_attached}	#{pane_current_path}
+tmux list-sessions -F #{session_name}	#{session_windows}	#{session_attached}	#{pane_current_path}

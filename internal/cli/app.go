@@ -62,7 +62,9 @@ type Env struct {
 	// DryRun is set by --dry-run (state-changing commands only).
 	DryRun  bool
 	Environ []string
-	Theme   ui.Theme
+	// Theme styles the messages for people (stderr): Rich when stderr is a
+	// colour terminal.
+	Theme ui.Theme
 }
 
 // Say prints a message for people on stderr; nothing under --json, where
@@ -219,7 +221,7 @@ func (a *App) runCommand(ctx context.Context, cmd *Command, args []string, sys S
 	env := &Env{
 		Stdin: sys.Stdin, Stdout: sys.Stdout, Stderr: sys.Stderr,
 		Command: cmd.Name(), JSON: inv.json, DryRun: inv.values.dryRun(),
-		Environ: sys.Environ, Theme: ui.Frappe,
+		Environ: sys.Environ, Theme: ui.For(sys.Stderr, sys.Environ),
 	}
 	result, err := cmd.run(ctx, env, cmd.bind(inv.values))
 	if result != nil {
@@ -249,7 +251,7 @@ func writeResult(sys System, result any, jsonOut bool) error {
 	if !jsonOut {
 		switch r := result.(type) {
 		case Humanizer:
-			text := r.Human(ui.Frappe)
+			text := r.Human(ui.For(sys.Stdout, sys.Environ))
 			if text != "" && !strings.HasSuffix(text, "\n") {
 				text += "\n"
 			}

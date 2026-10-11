@@ -1,0 +1,206 @@
+# relay session run: its re-exec inside tmux and the
+# environment each program it starts receives (docs/handover-relay.md). tmux,
+# claude and python3 (handover.py) are fakes: see setup.sh and fake/.
+
+exec sh setup.sh
+env CLAUDE_CONFIG_DIR=$WORK/claude
+
+# --until and --yolo go with --afk: exit 2.
+exits 2 relay session run --until 8 hi
+stderr '^relay: --until goes with --afk \(relay session run --help\)$'
+exits 2 relay session run --yolo
+stderr '--yolo goes with --afk'
+exits 2 relay session run --model opus --afk
+stderr '--afk needs a goal'
+! exists claude.log
+
+# Outside tmux: again inside a new tmux session tied to the tab
+# (HANDOVER_RELAY_OWN=1), in the current directory, the arguments untouched;
+# there, destroy-unattached on, then claude.
+cd proj
+exec relay session run --model opus --json hi
+cmpenv $WORK/stubs.log $WORK/want/tab.log
+cmp $WORK/claude.log $WORK/want/tab.claude
+cd $WORK
+
+# An AFK run: a named session afk-<dir> that outlives the tab. The deadline is
+# resolved once, before tmux (python3 handover.py until), and passed on as
+# @<epoch>; the YOLO settings merge the user's --settings.
+exec sh reset.sh
+cd my.proj
+exec relay session run --settings '{"a": 1}' --afk 'the goal' --until 8 --model opus --yolo
+stderr '^AFK until Mon 12 Oct 08:00 \(in 9h00\)$'
+stderr '^AFK run in tmux session afk-my-proj \(tmux attach -t afk-my-proj\)$'
+cmpenv $WORK/stubs.log $WORK/want/afk.log
+cmp $WORK/claude.log $WORK/want/afk.claude
+cd $WORK
+
+# A taken name gets -2, -3…
+exec sh reset.sh
+exec sh -c 'printf "afk-proj\nafk-proj-2\n" >tmux-sessions'
+cd proj
+exec relay session run --afk goal --until @1760248800
+stderr 'afk-proj-3'
+grep '^tmux new-session -s afk-proj-3 ' $WORK/stubs.log
+! grep python3 $WORK/stubs.log
+cd $WORK
+
+# Already inside tmux: claude in this pane; destroy-unattached only for a
+# session the relay owns.
+exec sh reset.sh
+env TMUX=/tmp/tmux-1/default,1,0 TMUX_PANE=%7
+exec relay session run hi
+! exists stubs.log
+cmp claude.log want/pane.claude
+exec sh reset.sh
+env HANDOVER_RELAY_OWN=1
+exec relay session run hi
+cmp stubs.log want/own.log
+env HANDOVER_RELAY_OWN= TMUX= TMUX_PANE=
+
+# handover.py is needed for --until and --yolo only: relay_missing without the
+# plugin. A deadline handover.py cannot read fails as the tool.
+exec sh reset.sh
+env CLAUDE_CONFIG_DIR=$WORK/empty
+exits 1 relay session run --afk goal --until 8
+stderr '^relay: handover@fundrivendev is not installed$'
+exec relay session run hi
+exists claude.log
+env CLAUDE_CONFIG_DIR=$WORK/claude
+exits 1 relay session run --afk goal --until bogus
+stderr 'python3 .*handover.py until bogus exited 1: handover: cannot read the deadline bogus'
+
+# Its help, though it is raw.
+exec relay session run --help
+stdout '^Usage: relay session run <arguments…>'
+stdout 'docs/handover-relay.md'
+exec relay session run --help --json
+stdout '"raw": true'
+
+-- setup.sh --
+# The fakes on PATH, a project directory, and the handover plugin installed
+# at $WORK/handover (its handover.py is run through the fake python3).
+set -e
+for f in tmux claude python3; do cp "fake/$f" "bin/$f" && chmod +x "bin/$f"; done
+mkdir -p proj my.proj empty claude/plugins handover/scripts
+: >handover/scripts/handover.py
+printf '{"plugins": {"handover@fundrivendev": [{"installPath": "%s/handover"}]}}\n' "$WORK" >claude/plugins/installed_plugins.json
+-- reset.sh --
+rm -f stubs.log claude.log .claude.calls tmux-sessions
+-- fake/tmux --
+#!/usr/bin/env bash
+# A fake tmux: logs each call to $WORK/stubs.log (the relay executable as
+# RELAY_EXE), knows the sessions listed in $WORK/tmux-sessions, and runs the
+# command of a new attached session as tmux would: in its -c directory, with
+# its -e variables, TMUX and TMUX_PANE set.
+{
+	printf tmux
+	for a in "$@"; do
+		case $a in */relay) a=RELAY_EXE ;; esac
+		printf ' %s' "$a"
+	done
+	echo
+} >>"$WORK/stubs.log"
+case $1 in
+	has-session) grep -qx -- "${3#=}" "$WORK/tmux-sessions" 2>/dev/null; exit ;;
+	list-sessions) cat "$WORK/tmux-list" 2>/dev/null; exit ;;
+	new-session) shift ;;
+	*) exit 0 ;;
+esac
+detach=""
+while (($#)); do
+	case $1 in
+		-d) detach=1 && shift ;;
+		-s) echo "$2" >>"$WORK/tmux-sessions" && shift 2 ;;
+		-c) cd "$2" && shift 2 ;;
+		-e) export "${2?}" && shift 2 ;;
+		*) break ;;
+	esac
+done
+cmd=()
+while (($#)) && [[ $1 != ";" ]]; do cmd+=("$1") && shift; done
+[[ -z $detach ]] || exit 0
+export TMUX=/tmp/tmux-1/default,1,0 TMUX_PANE=%1 PWD=$PWD
+exec "${cmd[@]}"
+-- fake/claude --
+#!/usr/bin/env bash
+# A fake claude: logs its arguments, its directory and the relay's environment
+# to $WORK/claude.log; on its n-th call, leaves $WORK/relay.<n> (a resume
+# message) in $HANDOVER_RELAY_FILE, as the plugin's relay does.
+n=$(($(cat "$WORK/.claude.calls" 2>/dev/null || echo 0) + 1))
+echo "$n" >"$WORK/.claude.calls"
+{
+	echo "call $n in ${PWD##*/}"
+	for a in "$@"; do echo "  arg $a"; done
+	env | grep -E '^(HANDOVER_[A-Z_]*|TMUX|TMUX_PANE)=' | sort | while IFS= read -r kv; do
+		case $kv in
+			TMUX=?*) kv="TMUX=<set>" ;;
+			HANDOVER_RELAY_FILE=?*) [[ -f ${kv#*=} ]] && kv="HANDOVER_RELAY_FILE=<a file>" ;;
+			HANDOVER_RELAY_PID=$PPID) kv="HANDOVER_RELAY_PID=<claude's parent>" ;;
+		esac
+		echo "  env $kv"
+	done
+} >>"$WORK/claude.log"
+[[ -z ${HANDOVER_RELAY_FILE:-} ]] || echo "$HANDOVER_RELAY_FILE" >"$WORK/relay-file"
+if [[ -f $WORK/relay.$n ]]; then cp "$WORK/relay.$n" "$HANDOVER_RELAY_FILE"; fi
+exit 0
+-- fake/python3 --
+#!/usr/bin/env bash
+# A fake python3 running handover.py: logs the call, answers until and
+# yolo-settings as handover.py does.
+{
+	printf 'python3 %s' "${1##*/}"
+	shift
+	printf ' %s' "$@"
+	echo
+} >>"$WORK/stubs.log"
+case $1 in
+	until)
+		if [[ $2 == bogus ]]; then echo "handover: cannot read the deadline bogus" >&2 && exit 1; fi
+		echo "AFK until Mon 12 Oct 08:00 (in 9h00)" >&2
+		echo 1760248800
+		;;
+	yolo-settings) printf '{"permissions": {"deny": ["Edit(//plugin)"]}, "merged": "%s"}\n' "${3:-}" ;;
+	*) exit 2 ;;
+esac
+-- want/tab.log --
+tmux new-session -c $WORK/proj -e HANDOVER_RELAY_OWN=1 RELAY_EXE session run --model opus --json hi
+tmux set-option -t %1 destroy-unattached on
+-- want/tab.claude --
+call 1 in proj
+  arg --model
+  arg opus
+  arg --json
+  arg hi
+  env HANDOVER_RELAY=1
+  env HANDOVER_RELAY_OWN=1
+  env TMUX=<set>
+  env TMUX_PANE=%1
+-- want/afk.log --
+python3 handover.py until 8
+tmux has-session -t =afk-my-proj
+tmux new-session -s afk-my-proj -c $WORK/my.proj RELAY_EXE session run --afk the goal --until @1760248800 --yolo --settings {"a": 1} --model opus
+python3 handover.py yolo-settings --merge {"a": 1}
+tmux set-option -t %1 destroy-unattached off
+-- want/afk.claude --
+call 1 in my.proj
+  arg --dangerously-skip-permissions
+  arg --settings
+  arg {"permissions": {"deny": ["Edit(//plugin)"]}, "merged": "{"a": 1}"}
+  arg --model
+  arg opus
+  arg the goal
+  env HANDOVER_AFK_GOAL=the goal
+  env HANDOVER_AFK_UNTIL=1760248800
+  env HANDOVER_AFK_YOLO=1
+  env HANDOVER_RELAY=1
+  env TMUX=<set>
+  env TMUX_PANE=%1
+-- want/pane.claude --
+call 1 in script-session_run
+  arg hi
+  env HANDOVER_RELAY=1
+  env TMUX=<set>
+  env TMUX_PANE=%7
+-- want/own.log --
+tmux set-option -t %7 destroy-unattached on
