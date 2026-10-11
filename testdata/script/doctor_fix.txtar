@@ -53,14 +53,17 @@ stdout '"name": "claude",\n +"command": "curl -fsSL https://claude.ai/install.sh
 cmp stubs.log failed.log
 rm sudo.exit stubs.log
 
-# --yes: every step runs, in order, then the checks pass.
-exec relay doctor fix --yes
+# --yes: every step runs, in order, the plugin's through ~/.local/bin. The
+# checks after them see the shell's PATH, where ~/.local/bin is missing: not
+# ready until it is added.
+exits 1 relay doctor fix --yes
 stderr '^running sudo apt-get install -y tmux$'
 stderr '^running curl -fsSL https://claude.ai/install.sh \| bash$'
 stderr 'is not on your PATH: add it to your shell''s profile'
 stdout '^✓ claude plugin install handover@fundrivendev$'
 stdout '^✓ handover-plugin +handover@fundrivendev 0.15.0$'
-stdout '^relay is ready.$'
+stdout '^✗ claude +~/.local/bin/claude is not on PATH: add it'
+! stdout 'relay is ready'
 cmp stubs.log ran.log
 
 # Claude Code installed, ~/.local/bin still off PATH: said, not reinstalled.
@@ -263,7 +266,6 @@ curl -fsSL https://claude.ai/install.sh
 claude plugin marketplace add FunDrivenDev/claude-plugins
 claude plugin install handover@fundrivendev
 python3 handover.py notifier
-claude --version
 python3 --version
 ps -o ppid= -p 1
 ps --version

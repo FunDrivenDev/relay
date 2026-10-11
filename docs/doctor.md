@@ -114,8 +114,9 @@ without `--yes` or `--dry-run` is a usage error, since it cannot ask.
 The first failing command stops the fix (`fix_failed`), the checks run again and the report says where it stands. Claude Code's
 installer puts `claude` in `~/.local/bin`: relay adds it to its own PATH for
 the plugin steps, and says to add it to the shell's when it is missing. The
-checks run again at the end: a required one still failing ends on
-`requirements_missing`.
+checks run again at the end, on the PATH relay started with: a required one
+still failing ends on `requirements_missing`, the `claude` check included
+while `~/.local/bin` is off the shell's PATH.
 
 ```json
 {

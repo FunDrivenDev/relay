@@ -110,12 +110,16 @@ fix: upgrade the distribution or the package).`,
 			return nil, err
 		}
 	}
+	// addLocalBin widens relay's PATH for the steps only: the checks after
+	// them see the shell's, where tmux will look for claude.
+	path := os.Getenv("PATH")
 	for i := range res.Steps {
 		s := &res.Steps[i]
 		env.Say("%s %s", t.Title.Render("running"), t.Command.Render(s.Command))
 		s.Ran = true
 		if err := runStep(ctx, env, s.Command); err != nil {
 			s.Error = err.Error()
+			restorePath(path)
 			res.OK, res.Checks = false, inspect(ctx, env).Checks
 			return res, &fail.Error{
 				Code: fail.FixFailed, Silent: !env.JSON, Err: err,
@@ -127,10 +131,16 @@ fix: upgrade the distribution or the package).`,
 			addLocalBin(env)
 		}
 	}
+	restorePath(path)
 	after := inspect(ctx, env)
 	res.OK, res.Checks = after.OK, after.Checks
 	return res, after.err(env)
 })
+
+// restorePath puts back the PATH relay started with.
+func restorePath(path string) {
+	_ = os.Setenv("PATH", path)
+}
 
 // confirm shows the plan and asks before running it: on a terminal only.
 func confirm(env *cli.Env, steps []StepResult) error {
