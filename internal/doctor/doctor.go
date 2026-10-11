@@ -197,7 +197,8 @@ func inspect(ctx context.Context, env *cli.Env) Report {
 	r := Report{OK: true, OS: goos, Distro: distro, Checks: checks}
 	root := asRoot(env)
 	for i, c := range r.Checks {
-		if c.install {
+		// apt-get is Ubuntu's: elsewhere the package manager is the user's.
+		if c.install && goos == "linux" {
 			r.Checks[i].Fix = fixWith(aptInstall(root, c.pkg))
 		}
 		if c.Required && !c.OK {
@@ -305,7 +306,7 @@ func osRelease(env *cli.Env) string {
 func checkOS(env *cli.Env, goos string) (Check, string) {
 	c := Check{Name: "os"}
 	if goos != "linux" {
-		c.Message = goos + ": relay is made for Linux; the sessions may work, the fixes are Ubuntu's"
+		c.Message = goos + ": relay is made for Linux; install the tools below with your package manager"
 		return c, ""
 	}
 	distro := osRelease(env)

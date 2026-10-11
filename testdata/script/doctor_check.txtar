@@ -23,6 +23,12 @@ env RELAY_GOOS=darwin
 exec relay doctor check
 stdout '^! os +darwin: relay is made for Linux'
 stdout 'relay is ready.'
+# There, no apt-get fix.
+rm bin/notify-send
+exec relay doctor check --json
+stdout '"name": "notify-send",\n +"ok": false,\n +"required": false,\n +"version": "",\n +"message": "[^"]*",\n +"fix": null'
+stdout '"fixes": \[\]'
+stub notify-send
 env RELAY_GOOS=linux
 
 # The optional tools missing: warnings, and their packages in the plan.

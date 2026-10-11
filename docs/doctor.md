@@ -2,7 +2,8 @@
 
 What relay needs on this machine, checked (`doctor check`, read-only) and
 installed (`doctor fix`). relay is made for Linux, and the fixes are Ubuntu's
-(apt-get); elsewhere the checks still run and the `os` check warns. Both
+(apt-get); elsewhere the checks still run, the `os` check warns, and only the
+Claude Code and plugin fixes are offered. Both
 commands follow [the CLI contract](contract.md).
 
 | Command | Does |
