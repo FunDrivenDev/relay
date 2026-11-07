@@ -1,0 +1,35 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended"
+  ],
+  "description": "Once a week, every update in one grouped pull request, majors in their own; a release waits 3 days. Security fixes open at once (`vulnerabilityAlerts`, fed by GitHub's Dependabot alerts, and OSV). Nothing merges itself.",
+  "schedule": [
+    "before 6am on monday"
+  ],
+  "timezone": "Europe/Paris",
+  "minimumReleaseAge": "3 days",
+  "enabledManagers": [
+    "gomod",
+    "mise",
+    "github-actions"
+  ],
+  "vulnerabilityAlerts": {
+    "labels": [
+      "security"
+    ]
+  },
+  "osvVulnerabilityAlerts": true,
+  "postUpdateOptions": [
+    "gomodTidy"
+  ],
+  "packageRules": [
+    {
+      "description": "Every update in one pull request a week, majors in their own.",
+      "matchPackageNames": [
+        "*"
+      ],
+      "groupName": "all dependencies"
+    }
+  ]
+}
