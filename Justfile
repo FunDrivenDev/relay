@@ -19,7 +19,7 @@ default:
 
 # Once per clone: install the pinned tools and the Go modules.
 init:
-    mise install
+    mise install --locked
     go mod download
 
 # Format the files in scope, fixing what the formatters can.
