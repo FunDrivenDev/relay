@@ -17,7 +17,7 @@ case "$scope" in
                 git ls-files --others --exclude-standard
             } | sort -u)
             # A change to the toolchain can change any result: check everything then.
-            if printf '%s\n' "$files" | grep -qE '^(mise\.(toml|lock)|go\.(mod|sum)|Justfile|scripts/.*\.sh|\.golangci\.yml|\.rumdl\.toml|_typos\.toml|\.yamlfmt\.yml)$'; then
+            if printf '%s\n' "$files" | grep -qE '^(mise(\.runtime)?\.(toml|lock)|\.miserc\.toml|go\.(mod|sum)|Justfile|scripts/.*\.sh|\.golangci\.yml|\.rumdl\.toml|_typos\.toml|\.yamlfmt\.yml)$'; then
                 files=$(git ls-files --cached --others --exclude-standard)
             fi
         fi
