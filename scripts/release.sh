@@ -97,11 +97,13 @@ tag="v$version"
 
 if released "$tag"; then
     say "$tag is already released"
+    # scripts/formula.sh reads these checksums, never a snapshot's.
+    run gh release download "$tag" --pattern checksums.txt --dir dist --clobber
     echo "{\"tag\": \"$tag\"}"
     exit 0
 fi
-# goreleaser creates the release and uploads every asset itself: a draft left by
-# a failed run is deleted so the rerun starts it again.
+# goreleaser creates the release as a draft and uploads every asset itself: a
+# draft left by a failed run is deleted so the rerun starts it again.
 if [[ "$(draft_of "$tag")" == true ]]; then
     run gh release delete "$tag" --yes
 fi
@@ -121,7 +123,17 @@ else
     tree=$(mktemp -d)
     trap 'git worktree remove --force "$tree" 2>/dev/null || rm -rf "$tree"; rmdir "$lock"' EXIT
     git worktree add --quiet --detach "$tree" "$tag"
-    (cd "$tree" && GITHUB_TOKEN=$token goreleaser release --clean)
+    (
+        cd "$tree"
+        mise trust --quiet
+        mise install --locked --quiet
+        GITHUB_TOKEN=$token goreleaser release --clean
+    )
+    # scripts/formula.sh reads the checksums from the checkout's dist/.
+    mkdir -p dist
+    cp "$tree/dist/checksums.txt" dist/checksums.txt
+    # goreleaser leaves the release a draft (.goreleaser.yaml): published once every asset is on it.
+    gh release edit "$tag" --draft=false
     url=$(gh release view "$tag" --json url --jq .url)
     say "published $tag: $url"
 fi

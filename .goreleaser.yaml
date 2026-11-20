@@ -61,3 +61,8 @@ nfpms:
 changelog:
   use: github
   sort: asc
+
+release:
+  # Published by scripts/release.sh once every asset is uploaded, so a failed
+  # run leaves a draft its rerun replaces.
+  draft: true
