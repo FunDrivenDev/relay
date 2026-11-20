@@ -127,7 +127,8 @@ else
         cd "$tree"
         mise trust --quiet
         mise install --locked --quiet
-        GITHUB_TOKEN=$token goreleaser release --clean
+        # mise exec: the tag's pins, not the caller's PATH.
+        GITHUB_TOKEN=$token mise exec -- goreleaser release --clean
     )
     # scripts/formula.sh reads the checksums from the checkout's dist/.
     mkdir -p dist
