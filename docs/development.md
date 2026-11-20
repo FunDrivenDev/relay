@@ -163,10 +163,15 @@ the version, so the latest release keeps one URL for `install.sh`),
 1. `just release` (snapshot) builds all of it into `dist/` without publishing.
    To try `install.sh` on it, serve `dist/` (`python3 -m http.server -d dist
    8000`) and run `RELAY_BASE_URL=http://<host>:8000 sh install.sh`.
-2. On main, clean and green: `git tag vX.Y.Z && git push origin vX.Y.Z`.
-3. `GITHUB_TOKEN=… just release publish` publishes the GitHub release of the
-   tag.
-4. `scripts/formula.sh X.Y.Z ><homebrew-tap>/Formula/relay.rb` writes the
+2. `just release publish`, from any clean checkout once main's checks
+   passed, computes the version from the commits since the last tag
+   (`toolbox release next`: a breaking change a major, a `feat` a minor, any
+   other a patch), tags origin/main, pushes the tag and publishes its GitHub
+   release with goreleaser (`GITHUB_TOKEN`, else `gh auth token`). Nothing is
+   committed: the tags hold the versions. A version given must be the
+   computed one or an existing tag, whose release a rerun finishes; its last
+   line is `{"tag": "vX.Y.Z"}`.
+3. `scripts/formula.sh X.Y.Z ><homebrew-tap>/Formula/relay.rb` writes the
    formula from `dist/checksums.txt`; open a PR on FunDrivenDev/homebrew-tap
    with it.
 

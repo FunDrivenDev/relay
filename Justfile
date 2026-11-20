@@ -45,9 +45,9 @@ audit:
 build:
     @scripts/build.sh
 
-# Build the release archives and packages into dist/ (snapshot), or publish the tag on HEAD (publish).
-release mode="snapshot":
-    @scripts/release.sh {{ quote(mode) }}
+# Build the release archives and packages into dist/ (snapshot), or release origin/main (publish [--dry-run] [vX.Y.Z]): the version computed from the commits since the last tag (`toolbox release next`), or an existing tag to finish, tagged and published by goreleaser, nothing committed.
+release mode="snapshot" *args:
+    @scripts/release.sh {{ quote(mode) }} {{ args }}
 
 # Run relay from the sources: just run session list --json.
 run *args:
