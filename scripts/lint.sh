@@ -38,7 +38,11 @@ if want shell; then
     in_scope '(^scripts/.*|^install)\.sh$' | xargs -r shellcheck
     in_scope '(^scripts/.*|^install)\.sh$' | xargs -r shfmt -d
 fi
-if want just && [[ -n "$(in_scope '^Justfile$')" ]]; then just --unstable --fmt --check; fi
+if want just && [[ -n "$(in_scope '^Justfile$')" ]]; then
+    just --unstable --fmt --check
+    # Every recipe runs the tools mise.toml pins (fundrivenOS rules/ci/just.md).
+    scripts/check-justfile.sh
+fi
 if want toml; then
     in_scope '\.toml$' | xargs -r env RUST_LOG=warn taplo fmt --check --colors never
     in_scope '\.toml$' | xargs -r env RUST_LOG=warn taplo lint --colors never
