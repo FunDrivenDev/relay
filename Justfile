@@ -7,7 +7,7 @@
 #            when the toolchain itself changed
 #   staged   files in the git index
 
-set shell := ["bash", "-euo", "pipefail", "-c"]
+set shell := ["mise", "exec", "--", "bash", "-euo", "pipefail", "-c"]
 
 # The binary `just build` writes.
 
