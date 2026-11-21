@@ -29,7 +29,8 @@ bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb  relay_linux_ar
 class Relay < Formula
   desc "Claude Code sessions under tmux, with the handover relay and AFK runs"
   homepage "https://github.com/FunDrivenDev/relay"
-  version "1.2.3"
+  url "https://github.com/FunDrivenDev/relay/releases/download/v1.2.3/relay_linux_amd64.tar.gz"
+  sha256 "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
   license "MIT"
 
   depends_on :linux
@@ -37,12 +38,8 @@ class Relay < Formula
 
   on_linux do
     on_arm do
-      url "https://github.com/FunDrivenDev/relay/releases/download/v#{version}/relay_linux_arm64.tar.gz"
+      url "https://github.com/FunDrivenDev/relay/releases/download/v1.2.3/relay_linux_arm64.tar.gz"
       sha256 "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-    end
-    on_intel do
-      url "https://github.com/FunDrivenDev/relay/releases/download/v#{version}/relay_linux_amd64.tar.gz"
-      sha256 "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     end
   end
 
